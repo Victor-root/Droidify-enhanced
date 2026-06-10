@@ -20,9 +20,18 @@ class ShizukuInstaller(private val context: Context) : Installer {
         private val SESSION_ID_REGEX = Regex("(?<=\\[).+?(?=])")
     }
 
+    /**
+     * The shell process currently being awaited. Tracked so that a cancellation (user pressing
+     * "Cancel" or the queue-level install timeout firing) can [Process.destroy] it and unblock the
+     * otherwise blocking [Process.waitFor], instead of hanging the install queue forever (#781).
+     */
+    @Volatile
+    private var runningProcess: Process? = null
+
     override suspend fun install(
         installItem: InstallItem,
     ): InstallState = suspendCancellableCoroutine { cont ->
+        cont.invokeOnCancellation { runCatching { runningProcess?.destroy() } }
         var sessionId: String? = null
         val file = Cache.getReleaseFile(context, installItem.installFileName)
         try {
@@ -72,17 +81,24 @@ class ShizukuInstaller(private val context: Context) : Installer {
     override suspend fun uninstall(packageName: PackageName) =
         context.uninstallPackage(packageName)
 
-    override fun close() = Unit
+    override fun close() {
+        runCatching { runningProcess?.destroy() }
+    }
 
     private data class ShellResult(val resultCode: Int, val out: String)
 
     private fun exec(command: String, stdin: InputStream? = null): ShellResult {
         val process = rikka.shizuku.Shizuku.newProcess(arrayOf("sh", "-c", command), null, null)
-        if (stdin != null) {
-            process.outputStream.use { stdin.copyTo(it) }
+        runningProcess = process
+        try {
+            if (stdin != null) {
+                process.outputStream.use { stdin.copyTo(it) }
+            }
+            val output = process.inputStream.bufferedReader().use(BufferedReader::readText)
+            val resultCode = process.waitFor()
+            return ShellResult(resultCode, output)
+        } finally {
+            runningProcess = null
         }
-        val output = process.inputStream.bufferedReader().use(BufferedReader::readText)
-        val resultCode = process.waitFor()
-        return ShellResult(resultCode, output)
     }
 }

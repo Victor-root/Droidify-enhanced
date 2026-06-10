@@ -136,7 +136,7 @@ class AppDetailViewModel @Inject constructor(
 
     fun removeQueue() {
         viewModelScope.launch {
-            installer remove packageName.toPackageName()
+            installer cancel packageName.toPackageName()
         }
     }
 
