@@ -279,4 +279,8 @@
     <string name="custom_buttons_export">Exporter boutons</string>
     <string name="custom_buttons_import">Importer boutons</string>
     <string name="custom_buttons_imported">Boutons persos importés</string>
+    <string name="theme_color">Couleur du thème</string>
+    <string name="theme_color_DESC">Choisir la couleur d\'accentuation de l\'app</string>
+    <string name="theme_color_default">Par défaut</string>
+    <string name="theme_color_wallpaper">Fond d\'écran</string>
 </resources>

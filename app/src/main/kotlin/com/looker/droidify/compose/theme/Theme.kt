@@ -246,14 +246,16 @@ fun DroidifyTheme(
     @Composable()
     () -> Unit,
 ) {
+    val context = LocalContext.current
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
 
-        darkTheme -> darkScheme
-        else -> lightScheme
+        // The activity theme is recolored from the user's chosen accent color at runtime
+        // (see MainActivity.applyAccentColor); read it back so Compose stays in sync with the
+        // classic View screens.
+        else -> context.toComposeColorScheme(if (darkTheme) darkScheme else lightScheme)
     }
 
     MaterialTheme(

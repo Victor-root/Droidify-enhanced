@@ -16,7 +16,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
@@ -34,6 +36,7 @@ import com.looker.droidify.compose.settings.components.SelectionSettingItem
 import com.looker.droidify.compose.settings.components.SettingHeader
 import com.looker.droidify.compose.settings.components.SwitchSettingItem
 import com.looker.droidify.compose.settings.components.TextInputSettingItem
+import com.looker.droidify.compose.settings.components.ThemeColorPickerDialog
 import com.looker.droidify.compose.settings.components.WarningBanner
 import com.looker.droidify.datastore.model.AutoSync
 import com.looker.droidify.datastore.model.InstallerType
@@ -117,6 +120,8 @@ fun SettingsScreen(
         }
     }
 
+    var showColorPicker by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -157,6 +162,14 @@ fun SettingsScreen(
                 ThemeSetting(
                     selectedTheme = settings.theme,
                     onThemeSelected = viewModel::setTheme,
+                )
+            }
+
+            item {
+                ActionSettingItem(
+                    title = stringResource(R.string.theme_color),
+                    description = stringResource(R.string.theme_color_DESC),
+                    onClick = { showColorPicker = true },
                 )
             }
 
@@ -400,6 +413,24 @@ fun SettingsScreen(
                 )
             }
         }
+    }
+
+    if (showColorPicker) {
+        ThemeColorPickerDialog(
+            selectedColor = settings.themeColor,
+            dynamicEnabled = settings.dynamicTheme,
+            showWallpaperOption = SdkCheck.isSnowCake,
+            onColorSelected = { color ->
+                if (settings.dynamicTheme) viewModel.setDynamicTheme(false)
+                viewModel.setThemeColor(color)
+                showColorPicker = false
+            },
+            onWallpaperSelected = {
+                viewModel.setDynamicTheme(true)
+                showColorPicker = false
+            },
+            onDismiss = { showColorPicker = false },
+        )
     }
 }
 

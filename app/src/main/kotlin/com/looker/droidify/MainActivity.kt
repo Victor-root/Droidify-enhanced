@@ -14,10 +14,13 @@ import androidx.core.view.WindowCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.commit
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.color.DynamicColors
+import com.google.android.material.color.DynamicColorsOptions
 import com.looker.droidify.database.CursorOwner
 import com.looker.droidify.datastore.SettingsRepository
 import com.looker.droidify.datastore.extension.getThemeRes
 import com.looker.droidify.datastore.get
+import com.looker.droidify.datastore.model.Theme
 import com.looker.droidify.installer.InstallManager
 import com.looker.droidify.installer.model.installFrom
 import com.looker.droidify.ui.appDetail.AppDetailFragment
@@ -88,35 +91,49 @@ class MainActivity : AppCompatActivity() {
         fun settingsRepository(): SettingsRepository
     }
 
-    private fun collectChange() {
+    private data class ThemeState(
+        val theme: Theme,
+        val dynamicTheme: Boolean,
+        val themeColor: Int,
+    )
+
+    private fun collectChange(): ThemeState {
         val hiltEntryPoint =
             EntryPointAccessors.fromApplication(this, CustomUserRepositoryInjector::class.java)
-        val newSettings = hiltEntryPoint.settingsRepository().get { theme to dynamicTheme }
-        runBlocking {
-            val theme = newSettings.first()
-            setTheme(
-                resources.configuration.getThemeRes(
-                    theme = theme.first,
-                    dynamicTheme = theme.second,
-                ),
-            )
-        }
+        val themeFlow = hiltEntryPoint.settingsRepository()
+            .get { ThemeState(theme, dynamicTheme, themeColor) }
+        val initial = runBlocking { themeFlow.first() }
+        setTheme(
+            resources.configuration.getThemeRes(
+                theme = initial.theme,
+                dynamicTheme = initial.dynamicTheme,
+            ),
+        )
         lifecycleScope.launch {
-            newSettings.drop(1).collect { themeAndDynamic ->
-                setTheme(
-                    resources.configuration.getThemeRes(
-                        theme = themeAndDynamic.first,
-                        dynamicTheme = themeAndDynamic.second,
-                    ),
-                )
-                recreate()
-            }
+            // Re-create the activity whenever the theme, the Material You toggle or the accent
+            // color changes, so onCreate re-applies the theme and the generated colors.
+            themeFlow.drop(1).collect { recreate() }
         }
+        return initial
+    }
+
+    /**
+     * Builds an MD3 color palette from the user's chosen accent ([ThemeState.themeColor]) and
+     * applies it to this activity, so every classic/View screen follows the chosen color. Skipped
+     * when Material You is enabled (S+), as the wallpaper-based theme already provides the colors.
+     */
+    private fun applyAccentColor(state: ThemeState) {
+        if (state.dynamicTheme && SdkCheck.isSnowCake) return
+        val options = DynamicColorsOptions.Builder()
+            .setContentBasedSource(state.themeColor)
+            .build()
+        DynamicColors.applyToActivityIfAvailable(this, options)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        collectChange()
+        val themeState = collectChange()
         super.onCreate(savedInstanceState)
+        applyAccentColor(themeState)
         val rootView = FrameLayout(this).apply { id = R.id.main_content }
         addContentView(
             rootView,

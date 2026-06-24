@@ -290,4 +290,8 @@
     <string name="custom_buttons_export">Export buttons</string>
     <string name="custom_buttons_import">Import buttons</string>
     <string name="custom_buttons_imported">Custom buttons imported</string>
+    <string name="theme_color">Theme color</string>
+    <string name="theme_color_DESC">Choose the accent color of the app</string>
+    <string name="theme_color_default">Default</string>
+    <string name="theme_color_wallpaper">Wallpaper</string>
 </resources>

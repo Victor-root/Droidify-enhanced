@@ -92,6 +92,12 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun setThemeColor(color: Int) {
+        viewModelScope.launch {
+            settingsRepository.setThemeColor(color)
+        }
+    }
+
     fun setHomeScreenSwiping(enabled: Boolean) {
         viewModelScope.launch {
             settingsRepository.setHomeScreenSwiping(enabled)
