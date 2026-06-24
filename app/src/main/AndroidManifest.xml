@@ -55,12 +55,6 @@
             <intent-filter>
                 <action android:name="android.intent.action.SHOW_APP_INFO" />
             </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
-                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
-            </intent-filter>
 
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -154,6 +148,24 @@
                 <data android:scheme="fdroidrepos" />
             </intent-filter>
 
+        </activity>
+
+        <!--
+          Compose entry point — now the launcher. The migration to Jetpack Compose is in progress,
+          so some screens are still incomplete. The legacy MainActivity above is kept only to keep
+          its deeplinks working until they are migrated.
+        -->
+        <activity
+            android:name=".compose.MainComposeActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
         </activity>
 
         <service

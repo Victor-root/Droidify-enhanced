@@ -36,6 +36,7 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -44,6 +45,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults.IconButtonWidthOption.Companion.Narrow
 import androidx.compose.material3.IconButtonDefaults.smallContainerSize
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -81,17 +83,24 @@ fun AppListScreen(
     val selectedCategories by viewModel.selectedCategories.collectAsState()
 
     val availableCategories by viewModel.categories.collectAsStateWithLifecycle()
+    val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
     Scaffold(
         topBar = {
-            AppListTopBar(
-                onNavigateToRepos = onNavigateToRepos,
-                onNavigateToSettings = onNavigateToSettings,
-                title = {
-                    Text("Droid-ify")
-                },
-            )
+            Column {
+                AppListTopBar(
+                    onSync = viewModel::sync,
+                    onNavigateToRepos = onNavigateToRepos,
+                    onNavigateToSettings = onNavigateToSettings,
+                    title = {
+                        Text("Droid-ify")
+                    },
+                )
+                if (isSyncing) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+            }
         },
     ) { contentPadding ->
         LazyColumn(
@@ -211,6 +220,7 @@ fun CategoriesList(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun AppListTopBar(
+    onSync: () -> Unit,
     onNavigateToRepos: () -> Unit,
     onNavigateToSettings: () -> Unit,
     title: @Composable () -> Unit,
@@ -220,7 +230,7 @@ private fun AppListTopBar(
         title = title,
         actions = {
             IconButton(
-                onClick = { expanded = true },
+                onClick = onSync,
                 modifier = Modifier.size(smallContainerSize(Narrow)),
             ) {
                 Icon(Icons.Filled.Sync, contentDescription = "Sync")
@@ -238,6 +248,13 @@ private fun AppListTopBar(
                 modifier = Modifier.size(smallContainerSize(Narrow)),
             ) {
                 Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Repos")
+            }
+            Spacer(Modifier.width(4.dp))
+            IconButton(
+                onClick = onNavigateToSettings,
+                modifier = Modifier.size(smallContainerSize(Narrow)),
+            ) {
+                Icon(Icons.Filled.Settings, contentDescription = "Settings")
             }
             Spacer(Modifier.width(4.dp))
         },

@@ -3,7 +3,9 @@ package com.looker.droidify.compose.appList
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.looker.droidify.data.AppRepository
+import com.looker.droidify.data.RepoRepository
 import com.looker.droidify.data.model.AppMinimal
 import com.looker.droidify.datastore.SettingsRepository
 import com.looker.droidify.datastore.get
@@ -19,12 +21,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 @OptIn(FlowPreview::class)
 class AppListViewModel @Inject constructor(
     private val appRepository: AppRepository,
+    private val repoRepository: RepoRepository,
     settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
@@ -70,5 +74,20 @@ class AppListViewModel @Inject constructor(
 
     fun toggleFavouritesOnly() {
         _favouritesOnly.value = !_favouritesOnly.value
+    }
+
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing
+
+    /** Manually re-syncs all enabled repositories, refreshing the app catalog. */
+    fun sync() {
+        viewModelScope.launch {
+            _isSyncing.value = true
+            try {
+                repoRepository.syncAll()
+            } finally {
+                _isSyncing.value = false
+            }
+        }
     }
 }
