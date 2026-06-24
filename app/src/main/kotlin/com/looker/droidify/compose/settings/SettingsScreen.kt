@@ -56,6 +56,9 @@ private const val FOXY_DROID_TITLE = "FoxyDroid"
 private const val FOXY_DROID_URL = "https://github.com/kitsunyan/foxy-droid"
 private const val DROID_IFY_TITLE = "Droid-ify"
 private const val DROID_IFY_URL = "https://github.com/Droid-ify/client"
+private const val DROID_IFY_AUTHOR = "LooKeR"
+private const val DROIDIFY_ENHANCED_TITLE = "Droidify Enhanced"
+private const val DROIDIFY_ENHANCED_URL = "https://github.com/Victor-root/Droidify-enhanced"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -384,8 +387,16 @@ fun SettingsScreen(
             item {
                 ActionSettingItem(
                     title = DROID_IFY_TITLE,
-                    description = BuildConfig.VERSION_NAME,
+                    description = DROID_IFY_AUTHOR,
                     onClick = { context.openLink(DROID_IFY_URL) },
+                )
+            }
+
+            item {
+                ActionSettingItem(
+                    title = DROIDIFY_ENHANCED_TITLE,
+                    description = BuildConfig.VERSION_NAME,
+                    onClick = { context.openLink(DROIDIFY_ENHANCED_URL) },
                 )
             }
         }
