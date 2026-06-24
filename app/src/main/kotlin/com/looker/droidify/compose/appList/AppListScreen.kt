@@ -109,6 +109,8 @@ fun AppListScreen(
         ) {
             stickyHeader {
                 Column(modifier = Modifier.background(MaterialTheme.colorScheme.background)) {
+                    Spacer(Modifier.height(8.dp))
+                    SearchBar(state = viewModel.searchQuery)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

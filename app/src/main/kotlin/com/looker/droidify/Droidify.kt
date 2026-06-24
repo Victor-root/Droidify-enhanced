@@ -30,6 +30,7 @@ import com.looker.droidify.datastore.model.AutoSync
 import com.looker.droidify.index.RepositoryUpdater
 import com.looker.droidify.installer.InstallManager
 import com.looker.droidify.network.Downloader
+import com.looker.droidify.data.InstalledRepository
 import com.looker.droidify.receivers.InstalledAppReceiver
 import com.looker.droidify.service.Connection
 import com.looker.droidify.service.SyncService
@@ -63,6 +64,9 @@ class Droidify : Application(), SingletonImageLoader.Factory, Configuration.Prov
 
     @Inject
     lateinit var settingsRepository: SettingsRepository
+
+    @Inject
+    lateinit var installedRepository: InstalledRepository
 
     @Inject
     lateinit var installer: InstallManager
@@ -102,10 +106,11 @@ class Droidify : Application(), SingletonImageLoader.Factory, Configuration.Prov
             ?.map { it.toInstalledItem() }
         if (installedItems != null) {
             Database.InstalledAdapter.putAll(installedItems)
+            appScope.launch { installedRepository.putAll(installedItems) }
         }
         appScope.launch {
             registerReceiver(
-                InstalledAppReceiver(packageManager),
+                InstalledAppReceiver(packageManager, installedRepository, appScope),
                 IntentFilter().apply {
                     addAction(Intent.ACTION_PACKAGE_ADDED)
                     addAction(Intent.ACTION_PACKAGE_REMOVED)

@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -29,9 +30,12 @@ import androidx.compose.material3.FilledTonalIconToggleButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -59,6 +63,7 @@ import com.looker.droidify.data.model.FilePath
 import com.looker.droidify.data.model.Package
 import com.looker.droidify.data.model.Repo
 import com.looker.droidify.datastore.model.CustomButton
+import com.looker.droidify.installer.model.InstallState
 import com.looker.droidify.utility.text.toAnnotatedString
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,6 +74,8 @@ fun AppDetailScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val customButtons by viewModel.customButtons.collectAsStateWithLifecycle()
+    val installState by viewModel.installState.collectAsStateWithLifecycle()
+    val downloadStatus by viewModel.downloadStatus.collectAsStateWithLifecycle()
     val uriHandler = LocalUriHandler.current
 
     Scaffold(
@@ -112,6 +119,12 @@ fun AppDetailScreen(
                     app = (state as AppDetailState.Success).app,
                     packages = (state as AppDetailState.Success).packages,
                     customButtons = customButtons,
+                    installState = installState,
+                    downloadStatus = downloadStatus,
+                    onInstallOrUpdate = viewModel::installOrUpdate,
+                    onLaunch = viewModel::launch,
+                    onUninstall = viewModel::uninstall,
+                    onCancel = viewModel::cancel,
                     onCustomButtonClick = { url ->
                         try {
                             uriHandler.openUri(url)
@@ -126,13 +139,160 @@ fun AppDetailScreen(
 }
 
 @Composable
+private fun PrimaryActions(
+    isInstalled: Boolean,
+    updateAvailable: Boolean,
+    installState: InstallState?,
+    downloadStatus: DownloadStatus?,
+    onInstallOrUpdate: () -> Unit,
+    onLaunch: () -> Unit,
+    onUninstall: () -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val installing = installState == InstallState.Pending || installState == InstallState.Installing
+    when {
+        downloadStatus != null -> DownloadProgressRow(
+            status = downloadStatus,
+            onCancel = onCancel,
+            modifier = modifier.fillMaxWidth(),
+        )
+
+        installing -> InstallingRow(
+            onCancel = onCancel,
+            modifier = modifier.fillMaxWidth(),
+        )
+
+        else -> Row(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            when {
+                !isInstalled -> Button(
+                    onClick = onInstallOrUpdate,
+                    modifier = Modifier.weight(1f),
+                ) { Text(stringResource(R.string.install)) }
+
+                updateAvailable -> Button(
+                    onClick = onInstallOrUpdate,
+                    modifier = Modifier.weight(1f),
+                ) { Text(stringResource(R.string.update)) }
+
+                else -> Button(
+                    onClick = onLaunch,
+                    modifier = Modifier.weight(1f),
+                ) { Text(stringResource(R.string.launch)) }
+            }
+            if (isInstalled) {
+                OutlinedButton(onClick = onUninstall) {
+                    Text(stringResource(R.string.uninstall))
+                }
+            }
+        }
+    }
+}
+
+/** Live download progress: a determinate bar with "12.3 MB / 45.6 MB · 2.3 MB/s · 56 %". */
+@Composable
+private fun DownloadProgressRow(
+    status: DownloadStatus,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = if (status.hasTotal) {
+                        "${status.readLabel} / ${status.totalLabel}"
+                    } else {
+                        status.readLabel
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                val trailing = buildString {
+                    status.speedLabel?.let { append(it) }
+                    if (status.hasTotal) {
+                        if (isNotEmpty()) append("  ·  ")
+                        append("${status.percent} %")
+                    }
+                }
+                if (trailing.isNotEmpty()) {
+                    Text(
+                        text = trailing,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            val fraction = status.fraction
+            if (fraction != null) {
+                LinearProgressIndicator(
+                    progress = { fraction },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+        }
+        TextButton(onClick = onCancel) {
+            Text(stringResource(R.string.cancel))
+        }
+    }
+}
+
+/** Shown after the download completes, while the system installer does its work. */
+@Composable
+private fun InstallingRow(
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.installing),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+        TextButton(onClick = onCancel) {
+            Text(stringResource(R.string.cancel))
+        }
+    }
+}
+
+@Composable
 private fun AppDetail(
     app: App,
     packages: List<Pair<Package, Repo>>,
     customButtons: List<CustomButton>,
+    installState: InstallState?,
+    downloadStatus: DownloadStatus?,
+    onInstallOrUpdate: () -> Unit,
+    onLaunch: () -> Unit,
+    onUninstall: () -> Unit,
+    onCancel: () -> Unit,
     onCustomButtonClick: (url: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val installedPackage = app.packages?.firstOrNull { it.installed }
+    val updateAvailable = installedPackage != null &&
+        installedPackage.manifest.versionCode < app.metadata.suggestedVersionCode
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -145,6 +305,17 @@ private fun AppDetail(
             isInstalled = app.packages?.any { it.installed } == true,
             isFavorite = true,
             modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        PrimaryActions(
+            isInstalled = installedPackage != null,
+            updateAvailable = updateAvailable,
+            installState = installState,
+            downloadStatus = downloadStatus,
+            onInstallOrUpdate = onInstallOrUpdate,
+            onLaunch = onLaunch,
+            onUninstall = onUninstall,
+            onCancel = onCancel,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
 
         if (customButtons.isNotEmpty()) {
