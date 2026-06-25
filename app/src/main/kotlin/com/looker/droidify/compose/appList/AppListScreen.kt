@@ -39,6 +39,8 @@ import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -48,16 +50,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults.IconButtonWidthOption.Companion.Narrow
 import androidx.compose.material3.IconButtonDefaults.smallContainerSize
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -74,10 +78,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.looker.droidify.R
+import com.looker.droidify.compose.githubApps.GithubAppsViewModel
 import com.looker.droidify.data.model.AppMinimal
+import com.looker.droidify.github.GithubApp
 import com.looker.droidify.datastore.extension.sortOrderName
 import com.looker.droidify.datastore.model.SortOrder
 import com.looker.droidify.datastore.model.supportedSortOrders
@@ -101,7 +108,17 @@ fun AppListScreen(
     val updatesCount by viewModel.updatesCount.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
+    // The GitHub tab is backed by its own ViewModel (Obtainium-style sources). Adding sources lives
+    // on the Repos screen; here we only browse and install/update them.
+    val githubViewModel: GithubAppsViewModel = hiltViewModel()
+    val githubApps by githubViewModel.apps.collectAsStateWithLifecycle()
+    val githubBusy by githubViewModel.busy.collectAsStateWithLifecycle()
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == AppTab.GITHUB) githubViewModel.refresh()
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(githubViewModel.snackbarHostState) },
         topBar = {
             Column {
                 AppListTopBar(
@@ -120,7 +137,7 @@ fun AppListScreen(
                     onSelectTab = viewModel::selectTab,
                 )
                 if (isSyncing) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    SyncBanner()
                 }
             }
         },
@@ -129,6 +146,20 @@ fun AppListScreen(
             state = listState,
             contentPadding = contentPadding,
         ) {
+            if (selectedTab == AppTab.GITHUB) {
+                if (githubApps.isEmpty()) {
+                    item(key = "github-empty") { GithubTabEmpty() }
+                }
+                items(items = githubApps, key = { it.key }) { app ->
+                    GithubTabItem(
+                        app = app,
+                        busy = app.key in githubBusy,
+                        onAction = { githubViewModel.installOrUpdate(app) },
+                        modifier = Modifier.animateItem(),
+                    )
+                }
+                return@LazyColumn
+            }
             if (selectedTab == AppTab.AVAILABLE && newApps.isNotEmpty()) {
                 item(key = "new-apps-showcase") {
                     NewAppsShowcase(apps = newApps, onAppClick = onAppClick)
@@ -199,9 +230,40 @@ private fun AppTabRow(
                         } else {
                             stringResource(R.string.updates)
                         }
+                        AppTab.GITHUB -> "GitHub"
                     }
                     Text(label)
                 },
+            )
+        }
+    }
+}
+
+/**
+ * Status strip shown under the tabs while a sync runs. A filled container (not a bare line that
+ * blended into the tab indicator) with a spinner + label, so it reads as "syncing", not decoration.
+ */
+@Composable
+private fun SyncBanner() {
+    Surface(
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Text(
+                text = stringResource(R.string.syncing),
+                style = MaterialTheme.typography.bodyMedium,
             )
         }
     }
@@ -213,6 +275,7 @@ private fun EmptyTabMessage(tab: AppTab) {
         AppTab.INSTALLED -> "No installed apps found"
         AppTab.UPDATES -> "Everything is up to date"
         AppTab.AVAILABLE -> ""
+        AppTab.GITHUB -> ""
     }
     Box(
         modifier = Modifier
@@ -547,4 +610,66 @@ private fun AppItem(
 fun AppMinimal.versionColors(): Pair<Color, Color> {
     val scheme = MaterialTheme.colorScheme
     return scheme.outline to scheme.background
+}
+
+/** A tracked GitHub-source app on the GitHub tab: name, install state, and an install/update action. */
+@Composable
+private fun GithubTabItem(
+    app: GithubApp,
+    busy: Boolean,
+    onAction: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .then(modifier),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = app.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                text = app.tabStatusLine(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        if (busy) {
+            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+        } else {
+            val label = when {
+                app.installedTag == null -> "Install"
+                app.hasUpdate -> "Update"
+                else -> "Reinstall"
+            }
+            Button(onClick = onAction) { Text(label) }
+        }
+    }
+}
+
+@Composable
+private fun GithubTabEmpty() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(32.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "No GitHub apps yet.\nAdd sources from the Repositories screen (the </> icon).",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+private fun GithubApp.tabStatusLine(): String = when {
+    installedTag == null -> "Not installed · latest ${latestTag ?: "?"}"
+    hasUpdate -> "$installedTag → ${latestTag ?: "?"}"
+    else -> "Installed $installedTag"
 }

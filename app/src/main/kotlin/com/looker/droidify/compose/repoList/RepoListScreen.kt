@@ -14,9 +14,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconToggleButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -45,6 +47,7 @@ fun RepoListScreen(
     viewModel: RepoListViewModel,
     onRepoClick: (Int) -> Unit,
     onBackClick: () -> Unit,
+    onNavigateToGithubApps: () -> Unit,
 ) {
     val repos by viewModel.stream.collectAsStateWithLifecycle()
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
@@ -54,6 +57,11 @@ fun RepoListScreen(
                 TopAppBar(
                     title = { Text(text = stringResource(R.string.repositories)) },
                     navigationIcon = { BackButton(onBackClick) },
+                    actions = {
+                        IconButton(onClick = onNavigateToGithubApps) {
+                            Icon(Icons.Default.Code, contentDescription = "GitHub apps")
+                        }
+                    },
                 )
                 if (isSyncing) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())

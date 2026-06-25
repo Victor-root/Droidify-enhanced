@@ -111,6 +111,8 @@ class AppListViewModel @Inject constructor(
             AppTab.AVAILABLE -> apps
             AppTab.INSTALLED -> apps.filter { it.packageName.name in installed }
             AppTab.UPDATES -> apps.filter { hasUpdate(it, installed, suggested) }
+            // The GitHub tab renders its own (non-F-Droid) list, so the catalogue list is empty.
+            AppTab.GITHUB -> emptyList()
         }
     }.asStateFlow(emptyList())
 
@@ -178,4 +180,4 @@ private data class AppQuery(
     val favSet: Set<String>,
 )
 
-enum class AppTab { AVAILABLE, INSTALLED, UPDATES }
+enum class AppTab { AVAILABLE, INSTALLED, UPDATES, GITHUB }

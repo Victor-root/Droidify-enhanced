@@ -32,6 +32,8 @@ import com.looker.droidify.compose.repoDetail.navigation.navigateToRepoDetail
 import com.looker.droidify.compose.repoDetail.navigation.repoDetail
 import com.looker.droidify.compose.repoEdit.navigation.navigateToRepoEdit
 import com.looker.droidify.compose.repoEdit.navigation.repoEdit
+import com.looker.droidify.compose.githubApps.navigation.githubApps
+import com.looker.droidify.compose.githubApps.navigation.navigateToGithubApps
 import com.looker.droidify.compose.repoList.navigation.navigateToRepoList
 import com.looker.droidify.compose.repoList.navigation.repoList
 import com.looker.droidify.compose.settings.navigation.navigateToSettings
@@ -233,7 +235,10 @@ class MainComposeActivity : ComponentActivity() {
                         repoList(
                             onRepoClick = { repoId -> navController.navigateToRepoDetail(repoId) },
                             onBackClick = { navController.popBackStack() },
+                            onNavigateToGithubApps = { navController.navigateToGithubApps() },
                         )
+
+                        githubApps(onBackClick = { navController.popBackStack() })
 
                         appDetail(
                             onBackClick = { navController.popBackStack() },
