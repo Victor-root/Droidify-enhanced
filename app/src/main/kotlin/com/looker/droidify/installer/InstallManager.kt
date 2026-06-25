@@ -3,7 +3,6 @@ package com.looker.droidify.installer
 import android.content.Context
 import android.util.Log
 import com.looker.droidify.data.model.PackageName
-import com.looker.droidify.database.Database
 import com.looker.droidify.datastore.SettingsRepository
 import com.looker.droidify.datastore.get
 import com.looker.droidify.datastore.model.InstallerType
@@ -14,7 +13,6 @@ import com.looker.droidify.installer.installers.session.SessionInstaller
 import com.looker.droidify.installer.installers.shizuku.ShizukuInstaller
 import com.looker.droidify.installer.model.InstallItem
 import com.looker.droidify.installer.model.InstallState
-import com.looker.droidify.service.SyncService
 import com.looker.droidify.utility.common.Constants
 import com.looker.droidify.utility.common.cache.Cache
 import com.looker.droidify.utility.common.extension.addAndCompute
@@ -25,7 +23,6 @@ import com.looker.droidify.utility.common.log
 import com.looker.droidify.utility.notifications.createInstallNotification
 import com.looker.droidify.utility.notifications.installNotification
 import com.looker.droidify.utility.notifications.removeInstallNotification
-import com.looker.droidify.utility.notifications.updatesAvailableNotification
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -206,21 +203,6 @@ class InstallManager(
         if (installer !is LegacyInstaller && deleteApkPreference.first()) {
             val apkFile = Cache.getReleaseFile(context, item.installFileName)
             apkFile.delete()
-        }
-        if (SyncService.autoUpdating) {
-            val updates = Database.ProductAdapter.getUpdates(skipSignature.first())
-            when {
-                updates.isEmpty() -> {
-                    SyncService.autoUpdating = false
-                    notificationManager?.cancel(Constants.NOTIFICATION_ID_UPDATES)
-                }
-                updates.map { it.packageName } != SyncService.autoUpdateStartedFor -> {
-                    notificationManager?.notify(
-                        Constants.NOTIFICATION_ID_UPDATES,
-                        updatesAvailableNotification(context, updates),
-                    )
-                }
-            }
         }
     }
 

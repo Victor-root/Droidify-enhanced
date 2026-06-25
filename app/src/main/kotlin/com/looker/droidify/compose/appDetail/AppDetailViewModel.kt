@@ -14,6 +14,7 @@ import com.looker.droidify.data.model.App
 import com.looker.droidify.data.model.Package
 import com.looker.droidify.data.model.PackageName
 import com.looker.droidify.data.model.Repo
+import com.looker.droidify.data.model.selectForDevice
 import com.looker.droidify.datastore.CustomButtonRepository
 import com.looker.droidify.datastore.SettingsRepository
 import com.looker.droidify.datastore.get
@@ -130,13 +131,17 @@ class AppDetailViewModel @Inject constructor(
         }
     }
 
-    /** Downloads the suggested release (verifying its hash) and installs it. */
+    /** Downloads the best release for *this* device (verifying its hash) and installs it. */
     fun installOrUpdate() {
         if (_downloadStatus.value != null) return
         val current = state.value as? AppDetailState.Success ?: return
-        val target = current.packages.firstOrNull { (pkg, _) ->
-            pkg.manifest.versionCode == current.app.metadata.suggestedVersionCode
-        } ?: current.packages.firstOrNull() ?: return
+        // Pick the release that actually runs on this device's CPU/SDK (see [selectForDevice]):
+        // installing e.g. the arm64 VLC APK on an x86 device fails with NO_MATCHING_ABIS.
+        val target = current.packages.selectForDevice(current.app.metadata.suggestedVersionCode)
+        if (target == null) {
+            toast("No version of this app is compatible with your device")
+            return
+        }
         downloadJob = viewModelScope.launch { downloadAndInstall(target.first, target.second) }
     }
 

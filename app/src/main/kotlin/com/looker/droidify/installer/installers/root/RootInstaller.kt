@@ -1,6 +1,7 @@
 package com.looker.droidify.installer.installers.root
 
 import android.content.Context
+import android.util.Log
 import com.looker.droidify.data.model.PackageName
 import com.looker.droidify.installer.installers.Installer
 import com.looker.droidify.installer.installers.uninstallPackage
@@ -8,6 +9,7 @@ import com.looker.droidify.installer.model.InstallItem
 import com.looker.droidify.installer.model.InstallState
 import com.looker.droidify.utility.common.SdkCheck
 import com.looker.droidify.utility.common.cache.Cache
+import com.looker.droidify.utility.common.log
 import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -25,7 +27,14 @@ class RootInstaller(private val context: Context) : Installer {
             installReasonFlag(),
             releaseFile.length(),
         )
+        log("Root install command: $installCommand", "RootInstaller", Log.INFO)
         Shell.cmd(installCommand).submit { shellResult ->
+            log(
+                "Root install result: success=${shellResult.isSuccess} code=${shellResult.code} " +
+                    "out=${shellResult.out} err=${shellResult.err}",
+                "RootInstaller",
+                Log.INFO,
+            )
             val result = if (shellResult.isSuccess) {
                 InstallState.Installed
             } else {

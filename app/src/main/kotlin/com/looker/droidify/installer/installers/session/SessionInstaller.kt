@@ -57,6 +57,7 @@ class SessionInstaller(private val context: Context) : Installer {
             override fun onProgressChanged(sessionId: Int, progress: Float) {}
             override fun onFinished(sessionId: Int, success: Boolean) {
                 if (sessionId == id) {
+                    log("Session $sessionId finished: success=$success", "SessionInstaller", Log.INFO)
                     cont.resume(
                         if (success) InstallState.Installed else InstallState.Failed,
                     )

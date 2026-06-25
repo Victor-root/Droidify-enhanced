@@ -69,9 +69,18 @@ parallèle de la nouvelle base Room.
 
 ### Phase 6 — Suppression de l'ancien système
 - [x] **Supprimer l'ancienne UI Views** : `MainActivity`, tout `ui/` (21 fichiers), `widget/` (5), `CursorOwner`, l'extension `Fragment.mainActivity` — supprimés ; entrée manifest retirée ; notifs + deeplinks repointés sur Compose.
-- [ ] Supprimer les **layouts XML** (21) + ressources héritées (menus / animators / styles) devenues inutilisées
-- [ ] **Unifier la couche données** : faire passer sync / install / `ProductPreferences` / export-import de dépôts sur la base **Room**, puis supprimer l'ancienne `database/` + l'ancienne synchro (`SyncService`, `RepositoryUpdater`)
-- [ ] Nettoyage final + élagage des dépendances inutilisées
+- [x] Supprimer les **layouts XML** (21) — fait ; reste les ressources héritées (anim/animator/styles) devenues inutilisées
+- [x] **Unifier la couche données — FAIT : un seul moteur de données (Room).** 🎉
+  - [x] Auto-sync (périodique + forcée) basculé sur le **nouveau moteur** (`SyncWorker` → `RepoRepository` → Room), au lieu du legacy `SyncService`. Toute synchro alimente maintenant Room.
+  - [x] `ProductPreferences` (ignorer les MàJ) et l'auto-MàJ de `InstallManager` découplés du legacy `Database`.
+  - [x] **Moteur de synchro legacy supprimé** : `SyncService` (+ `SyncService$Job`) et `RepositoryUpdater` supprimés — plus aucun appelant (init retirée de `Droidify`, entrées manifest et test associé supprimés, imports morts nettoyés).
+  - [x] **Export/import de dépôts (`SettingsViewModel`) porté sur Room** : lecture via `RepoRepository.getRepo` (conserve identifiants + miroirs), réimport via `insertRepo` + `enableRepository` (dédup par adresse, état activé restauré, sync déclenchée). Le format de fichier de backup legacy est conservé (mapping `Repo` → `Repository`).
+  - [x] **`UnarchiveWorker` (Android 15+) porté sur Room** : recherche via `AppRepository`, choix de l'APK via `selectForDevice`, téléchargement + vérif SHA-256 via le `Downloader` partagé, install via `InstallManager`. Ne dépend plus du legacy `Database` ni de `DownloadService`. ⚠️ Filtrage par signature retiré temporairement (le modèle Room ne stocke pas encore les signatures — `signer = emptySet()`) ; TODO posé pour le réintroduire.
+  - [x] **Legacy `Database` SQLite supprimé** : `Database.kt`, `table/` (`Table`, `DatabaseHelper`), `QueryBuilder`, `QueryLoader`, `ObservableCursor` supprimés ; `Database.init` retiré de `Droidify`. `RepositoryExporter` conservé (sérialisation du backup, indépendant de la base) — à reloger hors du package `database/` au nettoyage final.
+- [~] **Nettoyage final** :
+  - [x] **Code legacy mort supprimé** : l'ancien service de téléchargement (`service/` : `DownloadService`, `Connection`, `ConnectionService`, `DownloadManager`, `ReleaseFileValidator` + `di/DownloadModule` + l'extension `startUpdate`), les parseurs d'index legacy (`index/` : `IndexV1Parser`, `IndexMerger`, `OemRepositoryParser`), et les (dé)sérialiseurs + modèles legacy orphelins (`Product`/`Release`/`ProductItem`/`ProductPreference` Serialization, modèles `Product` + `ProductPreference`). Vérifié à chaque fois : zéro référence restante.
+  - Encore actifs (legacy de nom mais utilisés par le nouveau moteur, **à garder**) : modèles `Repository`, `Release`, `ProductItem`, `InstalledItem` ; `RepositorySerialization` + `RepositoryExporter` (backup des dépôts) ; `utility/extension/android/Android` (utilisé par `ReleaseItem`).
+  - [ ] Reste : ressources orphelines (`anim`/`animator`/styles/strings inutilisés), dépendances Gradle inutilisées, et reloger `RepositoryExporter` hors de `database/`.
 
 ## Stratégie (choix du mainteneur)
 L'app bascule **immédiatement** sur l'interface Compose : une seule app, une seule
@@ -94,3 +103,25 @@ d'apps ne marche qu'à partir de la phase 2) — c'est assumé. L'ancienne `Main
   `sync/v2/EntrySyncable.kt`), surtout **pas** `Uri.appendPath()` qui encoderait
   le `/` en `%2F` → le serveur renvoie une erreur et l'install échoue. (Bug
   corrigé dans `AppDetailViewModel.downloadAndInstall`.)
+- **Choix de l'APK multi-ABI** : les apps comme **VLC** publient un APK **par
+  ABI** (arm64-v8a, x86_64, x86…) sous des `versionCode` **différents** (…04, …03,
+  …02), et `suggestedVersionCode` = le plus haut = l'APK **arm64**. Prendre
+  bêtement le plus haut installe l'APK arm64 sur un appareil x86 →
+  `INSTALL_FAILED_NO_MATCHING_ABIS` (peu importe l'installateur : root **ou**
+  session). Il faut filtrer par ABI compatible (`Build.SUPPORTED_ABIS`) **avant**
+  de choisir le plus récent, comme l'ancien moteur. Logique centralisée dans
+  `data/model/DeviceAbi.kt` (`selectForDevice`), réutilisée par l'install
+  **et** l'écran (sinon « mise à jour dispo » en boucle sur x86).
+
+## Idées / features pour plus tard (après le moteur unique)
+> Demandées par le mainteneur ; à faire **après** avoir fini le moteur unique.
+
+1. **Barre de synchro DANS l'app** (pas seulement la notif Android) : afficher une
+   barre de chargement **dans l'interface** dès qu'une synchro de dépôts tourne —
+   au **1er lancement** (sinon écran vide qui fait croire à un bug), quand on
+   **active un dépôt** depuis l'écran Dépôts, et globalement pendant **toute**
+   synchro. (En + de la notification Android.)
+2. **Sources « release GitHub » à la Obtainium** : pouvoir ajouter le lien
+   *release* d'un projet GitHub comme une source custom, et télécharger / mettre à
+   jour l'app directement depuis Droidify via ce lien (sans vrai dépôt F-Droid),
+   exactement comme l'app **Obtainium**.

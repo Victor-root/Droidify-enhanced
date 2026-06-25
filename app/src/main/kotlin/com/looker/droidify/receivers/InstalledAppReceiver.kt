@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import com.looker.droidify.data.InstalledRepository
-import com.looker.droidify.database.Database
 import com.looker.droidify.utility.common.extension.getPackageInfoCompat
 import com.looker.droidify.utility.extension.toInstalledItem
 import kotlinx.coroutines.CoroutineScope
@@ -28,11 +27,8 @@ class InstalledAppReceiver(
                     val packageInfo = packageManager.getPackageInfoCompat(packageName)
                     if (packageInfo != null) {
                         val installedItem = packageInfo.toInstalledItem()
-                        // Legacy DB (still used by the Views screens) + the new data layer.
-                        Database.InstalledAdapter.put(installedItem)
                         scope.launch { installedRepository.put(installedItem) }
                     } else {
-                        Database.InstalledAdapter.delete(packageName)
                         scope.launch { installedRepository.delete(packageName) }
                     }
                 }

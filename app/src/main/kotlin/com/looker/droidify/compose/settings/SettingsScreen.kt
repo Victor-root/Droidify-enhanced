@@ -51,9 +51,14 @@ import java.util.*
 import kotlin.time.Duration
 
 private const val BACKUP_MIME_TYPE = "application/json"
-private const val SETTINGS_BACKUP_NAME = "droidify_settings"
-private const val REPO_BACKUP_NAME = "droidify_repos"
-private const val CUSTOM_BUTTONS_BACKUP_NAME = "custom_buttons"
+private const val SETTINGS_BACKUP_NAME = "droidify_settings.json"
+private const val REPO_BACKUP_NAME = "droidify_repos.json"
+private const val CUSTOM_BUTTONS_BACKUP_NAME = "custom_buttons.json"
+
+// Backups are JSON. Older exports were written without a file extension, and file managers then
+// report them as application/octet-stream (or text/plain) — which made the backup file appear
+// greyed out / unselectable in the import picker. Accept those types too so any backup is pickable.
+private val IMPORT_MIME_TYPES = arrayOf("application/json", "application/octet-stream", "text/plain")
 
 private const val FOXY_DROID_TITLE = "FoxyDroid"
 private const val FOXY_DROID_URL = "https://github.com/kitsunyan/foxy-droid"
@@ -346,7 +351,7 @@ fun SettingsScreen(
                 ActionSettingItem(
                     title = stringResource(R.string.import_settings_title),
                     description = stringResource(R.string.import_settings_DESC),
-                    onClick = { importSettingsLauncher.launch(arrayOf(BACKUP_MIME_TYPE)) },
+                    onClick = { importSettingsLauncher.launch(IMPORT_MIME_TYPES) },
                 )
             }
 
@@ -362,7 +367,7 @@ fun SettingsScreen(
                 ActionSettingItem(
                     title = stringResource(R.string.import_repos_title),
                     description = stringResource(R.string.import_repos_DESC),
-                    onClick = { importReposLauncher.launch(arrayOf(BACKUP_MIME_TYPE)) },
+                    onClick = { importReposLauncher.launch(IMPORT_MIME_TYPES) },
                 )
             }
 
@@ -383,7 +388,7 @@ fun SettingsScreen(
                     onUpdateButton = viewModel::updateCustomButton,
                     onRemoveButton = viewModel::removeCustomButton,
                     onExport = { exportCustomButtonsLauncher.launch(CUSTOM_BUTTONS_BACKUP_NAME) },
-                    onImport = { importCustomButtonsLauncher.launch(arrayOf(BACKUP_MIME_TYPE)) },
+                    onImport = { importCustomButtonsLauncher.launch(IMPORT_MIME_TYPES) },
                 )
             }
 

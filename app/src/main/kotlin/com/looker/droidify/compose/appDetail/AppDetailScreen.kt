@@ -75,6 +75,7 @@ import com.looker.droidify.data.model.FilePath
 import com.looker.droidify.data.model.Package
 import com.looker.droidify.data.model.Permission
 import com.looker.droidify.data.model.Repo
+import com.looker.droidify.data.model.selectForDevice
 import com.looker.droidify.datastore.model.CustomButton
 import com.looker.droidify.installer.model.InstallState
 import com.looker.droidify.utility.text.toAnnotatedString
@@ -311,8 +312,14 @@ private fun AppDetail(
     modifier: Modifier = Modifier,
 ) {
     val installedPackage = app.packages?.firstOrNull { it.installed }
-    val updateAvailable = installedPackage != null &&
-        installedPackage.manifest.versionCode < app.metadata.suggestedVersionCode
+    // The newest release this device can actually install (device-aware; see [selectForDevice]).
+    // Comparing against the raw suggested code would keep flagging an update on, say, an x86 device,
+    // because VLC's suggested code belongs to its (un-installable) arm64 build.
+    val installablePackage = remember(packages, app.metadata.suggestedVersionCode) {
+        packages.selectForDevice(app.metadata.suggestedVersionCode)?.first
+    }
+    val updateAvailable = installedPackage != null && installablePackage != null &&
+        installedPackage.manifest.versionCode < installablePackage.manifest.versionCode
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -391,9 +398,7 @@ private fun AppDetail(
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
         }
-        val suggestedPackage = packages.firstOrNull { (pkg, _) ->
-            pkg.manifest.versionCode == app.metadata.suggestedVersionCode
-        }?.first ?: packages.firstOrNull()?.first
+        val suggestedPackage = installablePackage ?: packages.firstOrNull()?.first
 
         suggestedPackage?.whatsNew?.takeIf { it.isNotBlank() }?.let { whatsNew ->
             Spacer(modifier = Modifier.height(16.dp))
@@ -412,9 +417,9 @@ private fun AppDetail(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        val suggestedVersion = app.metadata.suggestedVersionCode
+        val suggestedVersion = installablePackage?.manifest?.versionCode
         packages.forEach { (pkg, repo) ->
-            val isSuggested = pkg.manifest.versionCode == suggestedVersion
+            val isSuggested = suggestedVersion != null && pkg.manifest.versionCode == suggestedVersion
             PackageItem(
                 item = pkg,
                 repo = repo,
