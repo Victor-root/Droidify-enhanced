@@ -49,7 +49,10 @@ android {
             applicationIdSuffix = ".alpha"
             versionNameSuffix = ".a"
             isMinifyEnabled = true
-            isDebuggable = true
+            // Non-debuggable on purpose: ART skips profile-guided AOT for debuggable builds, so the
+            // baseline profile (and representative performance) only kicks in when this is false.
+            // It still inherits the debug signing config, so it installs directly from the IDE.
+            isDebuggable = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard.pro",
@@ -209,6 +212,10 @@ dependencies {
     ksp(libs.room.compiler)
 
     implementation(libs.work.ktx)
+
+    // Installs the bundled baseline profile (src/main/baseline-prof.txt) so ART AOT-compiles the
+    // hot startup + scrolling paths, removing the cold-start jank inherent to a JIT-only first run.
+    implementation(libs.profileinstaller)
 
     implementation(libs.hilt.core)
     implementation(libs.hilt.android)
