@@ -25,9 +25,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.sample
+import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -57,7 +61,17 @@ class AppListViewModel @Inject constructor(
 
     // Emits whenever the catalogue (apps/versions) changes — e.g. after a sync — so every list
     // below re-queries automatically instead of waiting for the user to change a filter.
-    private val catalogChanges: StateFlow<Int> = appRepository.catalogChanges.asStateFlow(0)
+    //
+    // The first sync grows the catalogue from 0 to thousands of rows, and Room re-emits the count on
+    // every insert batch. Left un-throttled, that flood makes the list flows re-query and the grid
+    // recompose continuously (and mapLatest keep cancelling/restarting the query), starving the main
+    // thread — which freezes the sync spinner so the app looks crashed. We emit the first value
+    // immediately (no startup delay), then sample the rest so the lists refresh a couple of times a
+    // second during a sync: plenty to show progress while keeping the UI responsive.
+    private val catalogChanges: StateFlow<Int> = merge(
+        appRepository.catalogChanges.take(1),
+        appRepository.catalogChanges.drop(1).sample(CATALOG_REFRESH_MS),
+    ).distinctUntilChanged().asStateFlow(0)
 
     val appsState: StateFlow<List<AppMinimal>> = combine(
         searchQueryStream,
@@ -183,6 +197,9 @@ class AppListViewModel @Inject constructor(
 }
 
 private const val NEW_APPS_COUNT = 12
+
+/** How often catalogue changes are allowed to refresh the lists (throttles the first-sync flood). */
+private const val CATALOG_REFRESH_MS = 500L
 
 private data class AppQuery(
     val search: String,
