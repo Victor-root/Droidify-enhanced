@@ -1,6 +1,8 @@
 import com.android.build.gradle.internal.tasks.factory.dependsOn
 import io.gitlab.arturbosch.detekt.Detekt
 import io.gitlab.arturbosch.detekt.DetektCreateBaselineTask
+import java.io.FileInputStream
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -11,6 +13,17 @@ plugins {
     alias(libs.plugins.compose)
     alias(libs.plugins.detekt)
 }
+
+// Release signing is read from a keystore.properties file at the project root (gitignored, never
+// committed). When it's absent — e.g. on CI or an F-Droid/IzzyOnDroid build server that signs the
+// APK itself — the release build is simply left unsigned instead of failing.
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        FileInputStream(keystorePropertiesFile).use { load(it) }
+    }
+}
+val hasReleaseSigning = keystorePropertiesFile.exists()
 
 android {
     val latestVersionName = "0.8"
@@ -35,10 +48,26 @@ android {
         arg("room.generateKotlin", "true")
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            // Signed only when keystore.properties is present (see top of file). Without it the
+            // release APK is unsigned — fine for an F-Droid/IzzyOnDroid build that signs on their end.
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard.pro",
