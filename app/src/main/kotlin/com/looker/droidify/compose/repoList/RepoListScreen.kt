@@ -47,7 +47,7 @@ fun RepoListScreen(
     viewModel: RepoListViewModel,
     onRepoClick: (Int) -> Unit,
     onBackClick: () -> Unit,
-    onNavigateToGithubApps: () -> Unit,
+    onNavigateToExternalApps: () -> Unit,
 ) {
     val repos by viewModel.stream.collectAsStateWithLifecycle()
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
@@ -58,10 +58,10 @@ fun RepoListScreen(
                     title = { Text(text = stringResource(R.string.repositories)) },
                     navigationIcon = { BackButton(onBackClick) },
                     actions = {
-                        IconButton(onClick = onNavigateToGithubApps) {
+                        IconButton(onClick = onNavigateToExternalApps) {
                             Icon(
                                 painterResource(R.drawable.ic_tabler_package),
-                                contentDescription = "GitHub apps",
+                                contentDescription = stringResource(R.string.external_apps_title),
                             )
                         }
                     },

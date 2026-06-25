@@ -47,7 +47,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -92,9 +91,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.looker.droidify.R
-import com.looker.droidify.compose.githubApps.GithubAppsViewModel
+import com.looker.droidify.compose.externalApps.ExternalAppCard
+import com.looker.droidify.compose.externalApps.ExternalAppsViewModel
 import com.looker.droidify.data.model.AppMinimal
-import com.looker.droidify.github.GithubApp
 import com.looker.droidify.datastore.extension.sortOrderName
 import com.looker.droidify.datastore.model.SortOrder
 import com.looker.droidify.datastore.model.supportedSortOrders
@@ -116,17 +115,23 @@ fun AppListScreen(
     val gridState = rememberLazyGridState()
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
 
-    // The GitHub tab is backed by its own ViewModel (Obtainium-style sources). Adding sources lives
-    // on the Repos screen; here we only browse and install/update them.
-    val githubViewModel: GithubAppsViewModel = hiltViewModel()
-    val githubApps by githubViewModel.apps.collectAsStateWithLifecycle()
-    val githubBusy by githubViewModel.busy.collectAsStateWithLifecycle()
+    // The External tab is backed by its own ViewModel (Obtainium-style sources: GitHub/GitLab/
+    // Codeberg). Adding sources lives on the Repos screen; here we browse them with the full install
+    // lifecycle (progress bar + Install/Update/Open/Uninstall), just like the F-Droid tabs.
+    val externalViewModel: ExternalAppsViewModel = hiltViewModel()
+    val externalApps by externalViewModel.apps.collectAsStateWithLifecycle()
+    val externalDownloads by externalViewModel.downloads.collectAsStateWithLifecycle()
+    val externalInstallStates by externalViewModel.installStates.collectAsStateWithLifecycle()
+    val externalInstalledKeys by externalViewModel.installedKeys.collectAsStateWithLifecycle()
     LaunchedEffect(selectedTab) {
-        if (selectedTab == AppTab.GITHUB) githubViewModel.refresh()
+        if (selectedTab == AppTab.EXTERNAL) {
+            externalViewModel.refresh()
+            externalViewModel.refreshInstalled()
+        }
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(githubViewModel.snackbarHostState) },
+        snackbarHost = { SnackbarHost(externalViewModel.snackbarHostState) },
         topBar = {
             Column {
                 AppListTopBar(
@@ -165,17 +170,28 @@ fun AppListScreen(
             state = gridState,
             contentPadding = contentPadding,
         ) {
-            if (selectedTab == AppTab.GITHUB) {
-                if (githubApps.isEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }, key = "github-empty") {
-                        GithubTabEmpty()
+            if (selectedTab == AppTab.EXTERNAL) {
+                if (externalApps.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "external-empty") {
+                        ExternalTabEmpty()
                     }
                 }
-                items(items = githubApps, key = { it.key }) { app ->
-                    GithubAppCard(
+                items(
+                    items = externalApps,
+                    key = { it.key },
+                    // Full-width rows: the lifecycle card (progress bar + action buttons) needs the
+                    // space, unlike the 2-column catalogue cards.
+                    span = { GridItemSpan(maxLineSpan) },
+                ) { app ->
+                    ExternalAppCard(
                         app = app,
-                        busy = app.key in githubBusy,
-                        onAction = { githubViewModel.installOrUpdate(app) },
+                        downloadStatus = externalDownloads[app.key],
+                        installState = externalInstallStates[app.key],
+                        isInstalled = app.key in externalInstalledKeys,
+                        onInstallOrUpdate = { externalViewModel.installOrUpdate(app) },
+                        onLaunch = { externalViewModel.launch(app) },
+                        onUninstall = { externalViewModel.uninstall(app) },
+                        onCancel = { externalViewModel.cancel(app) },
                         modifier = Modifier.animateItem(),
                     )
                 }
@@ -226,7 +242,7 @@ private fun AppTabRow(
                         } else {
                             stringResource(R.string.updates)
                         }
-                        AppTab.GITHUB -> "GitHub"
+                        AppTab.EXTERNAL -> stringResource(R.string.tab_external)
                     }
                     Text(label)
                 },
@@ -271,7 +287,7 @@ private fun EmptyTabMessage(tab: AppTab) {
         AppTab.INSTALLED -> "No installed apps found"
         AppTab.UPDATES -> "Everything is up to date"
         AppTab.AVAILABLE -> ""
-        AppTab.GITHUB -> ""
+        AppTab.EXTERNAL -> ""
     }
     Box(
         modifier = Modifier
@@ -614,60 +630,8 @@ private fun AppCard(
     }
 }
 
-/** A tracked external-source app on the GitHub tab, as a grid card with an install/update action. */
 @Composable
-private fun GithubAppCard(
-    app: GithubApp,
-    busy: Boolean,
-    onAction: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(6.dp),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = app.label,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = app.tabStatusLine(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(10.dp))
-            if (busy) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-            } else {
-                val label = when {
-                    app.installedTag == null -> "Install"
-                    app.hasUpdate -> "Update"
-                    else -> "Reinstall"
-                }
-                Button(onClick = onAction, modifier = Modifier.fillMaxWidth()) { Text(label) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun GithubTabEmpty() {
+private fun ExternalTabEmpty() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -675,16 +639,10 @@ private fun GithubTabEmpty() {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = "No GitHub apps yet.\nAdd sources from the Repositories screen (the </> icon).",
+            text = stringResource(R.string.external_empty_tab),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
     }
-}
-
-private fun GithubApp.tabStatusLine(): String = when {
-    installedTag == null -> "Not installed · latest ${latestTag ?: "?"}"
-    hasUpdate -> "$installedTag → ${latestTag ?: "?"}"
-    else -> "Installed $installedTag"
 }

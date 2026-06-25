@@ -1,4 +1,4 @@
-package com.looker.droidify.github
+package com.looker.droidify.external
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -17,12 +17,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Persists the user's tracked GitHub app sources as a JSON file in the app's storage. Mirrors
+ * Persists the user's tracked external app sources as a JSON file in the app's storage. Mirrors
  * [com.looker.droidify.datastore.CustomButtonRepository] so we avoid a Room schema migration for
  * what is a short, user-managed list.
  */
 @Singleton
-class GithubAppRepository @Inject constructor(
+class ExternalAppRepository @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) {
     private val json = Json {
@@ -33,20 +33,20 @@ class GithubAppRepository @Inject constructor(
 
     private val mutex = Mutex()
     private var isLoaded = false
-    private val _apps = MutableStateFlow<List<GithubApp>>(emptyList())
+    private val _apps = MutableStateFlow<List<ExternalApp>>(emptyList())
 
-    val apps: Flow<List<GithubApp>> = flow {
+    val apps: Flow<List<ExternalApp>> = flow {
         ensureLoaded()
         emitAll(_apps)
     }
 
-    suspend fun getApps(): List<GithubApp> {
+    suspend fun getApps(): List<ExternalApp> {
         ensureLoaded()
         return _apps.value
     }
 
-    /** Adds [app] unless an entry with the same owner/repo is already tracked. */
-    suspend fun addApp(app: GithubApp) {
+    /** Adds [app] unless an entry with the same key is already tracked. */
+    suspend fun addApp(app: ExternalApp) {
         mutex.withLock {
             ensureLoadedInternal()
             if (_apps.value.any { it.key == app.key }) return@withLock
@@ -56,8 +56,8 @@ class GithubAppRepository @Inject constructor(
         }
     }
 
-    /** Replaces the tracked app sharing [GithubApp.key], or adds it when absent. */
-    suspend fun upsertApp(app: GithubApp) {
+    /** Replaces the tracked app sharing [ExternalApp.key], or adds it when absent. */
+    suspend fun upsertApp(app: ExternalApp) {
         mutex.withLock {
             ensureLoadedInternal()
             val updated = if (_apps.value.any { it.key == app.key }) {
@@ -92,27 +92,42 @@ class GithubAppRepository @Inject constructor(
         }
     }
 
-    private suspend fun loadFromFile(): List<GithubApp> = withContext(Dispatchers.IO) {
+    private suspend fun loadFromFile(): List<ExternalApp> = withContext(Dispatchers.IO) {
         val file = File(context.filesDir, FILE_NAME)
-        if (!file.exists()) return@withContext emptyList()
-        try {
-            json.decodeFromString(ListSerializer(GithubApp.serializer()), file.readText())
-        } catch (e: Exception) {
-            e.printStackTrace()
-            emptyList()
+        // One-time migration: the feature was originally GitHub-only and stored its list in
+        // github_apps.json. Its JSON is a compatible subset of ExternalApp (provider defaults to
+        // GitHub), so we can read it straight in and re-save under the new name.
+        if (!file.exists()) {
+            val legacy = File(context.filesDir, LEGACY_FILE_NAME)
+            if (legacy.exists()) {
+                val migrated = decode(legacy)
+                if (migrated.isNotEmpty()) saveToFile(migrated)
+                runCatching { legacy.delete() }
+                return@withContext migrated
+            }
+            return@withContext emptyList()
         }
+        decode(file)
     }
 
-    private suspend fun saveToFile(apps: List<GithubApp>) = withContext(Dispatchers.IO) {
+    private fun decode(file: File): List<ExternalApp> = try {
+        json.decodeFromString(ListSerializer(ExternalApp.serializer()), file.readText())
+    } catch (e: Exception) {
+        e.printStackTrace()
+        emptyList()
+    }
+
+    private suspend fun saveToFile(apps: List<ExternalApp>) = withContext(Dispatchers.IO) {
         try {
             val file = File(context.filesDir, FILE_NAME)
-            file.writeText(json.encodeToString(ListSerializer(GithubApp.serializer()), apps))
+            file.writeText(json.encodeToString(ListSerializer(ExternalApp.serializer()), apps))
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
     companion object {
-        private const val FILE_NAME = "github_apps.json"
+        private const val FILE_NAME = "external_apps.json"
+        private const val LEGACY_FILE_NAME = "github_apps.json"
     }
 }

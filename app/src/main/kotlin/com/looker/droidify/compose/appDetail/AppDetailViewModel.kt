@@ -35,6 +35,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
@@ -106,6 +107,9 @@ class AppDetailViewModel @Inject constructor(
             }
         }
         .onStart { emit(AppDetailState.Loading) }
+        // The map above resolves each repo and rebuilds the package list; keep that off the main
+        // thread so opening a detail page (and the Room re-emissions during a sync) never ANRs.
+        .flowOn(Dispatchers.Default)
         .asStateFlow(AppDetailState.Loading)
 
     /** Launches the installed app, if it exposes a launcher activity. */

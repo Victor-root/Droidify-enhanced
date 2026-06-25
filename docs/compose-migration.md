@@ -126,24 +126,26 @@ d'apps ne marche qu'à partir de la phase 2) — c'est assumé. L'ancienne `Main
 > style citées : **Aurora Store** (affichage des apps) et **tabler.io** (icônes). Seul le panneau
 > Réglages est jugé déjà beau/moderne.
 
-1. **Apps externes = cycle de vie complet** : sur l'onglet GitHub, vraie barre de progression +
-   boutons Install / Désinstaller / Lancer / MàJ, exactement comme les apps F-Droid des autres
-   onglets (réutiliser la logique de `AppDetail`).
-2. **Recherche repliable** : retirer la barre de recherche permanente ; bouton **loupe** dans le
-   header qui déplie un champ au tap (masqué par défaut).
-3. **Refonte de la liste d'apps** — **décidé : grille de cartes 2 colonnes** (style vitrine :
-   icône large + nom + bouton/état). **Supprimer** les chips de catégories défilantes + le chip
-   « Favourites » (catégories → derrière un bouton filtre). Ne plus ressembler au Droid-ify d'origine.
-4. **Retirer la surbrillance d'accent** : plus de fond/surbrillance teinté de la couleur d'accent
-   (rouge/couleur user) ; utiliser neutre **noir/blanc selon light/dark**.
+1. [x] **Apps externes = cycle de vie complet** : sur l'onglet **Externe**, vraie barre de
+   progression (taille/%/vitesse) + boutons Installer / Mettre à jour / Ouvrir / Désinstaller,
+   comme les apps F-Droid (lignes de progression partagées via `components/InstallProgress.kt`,
+   carte partagée `ExternalAppCard`). **Fait.**
+2. [x] **Recherche repliable** : bouton **loupe** dans le header qui déplie un champ au tap
+   (masqué par défaut). **Fait.**
+3. [x] **Refonte de la liste d'apps** — **grille de cartes 2 colonnes** (icône large + nom +
+   résumé + version), chips de catégories défilantes supprimées. **Fait.**
+4. [x] **Retirer la surbrillance d'accent** : surfaces neutres **noir/blanc selon light/dark**
+   (`Theme.withNeutralSurfaces` + `surfaceTint` transparent), accent réservé titres/boutons. **Fait.**
 5. [x] **Retirer le toggle « Material You »** des Réglages (doublon avec l'option *Fond d'écran* de
    la palette de couleurs, qui active déjà Material You). **Fait.**
 6. **Traductions FR** : tout ce qui a été ajouté récemment est en dur en anglais → passer par des
-   `string` resources + `values-fr` (« GitHub apps », Install/Update, hints, snackbars, etc.).
-7. **Refonte des icônes** (surtout les **4 du header**, jugées vieillottes) : remplacer par des
-   vecteurs **tabler.io** (SVG → vector drawable), partout dans l'app.
-8. **Sources externes universelles** — **décidé : GitHub + GitLab + Codeberg** (détection auto
-   depuis l'URL), à la Obtainium. Renommer l'onglet « Externe » / « Sources », abstraire `github/`.
+   `string` resources + `values-fr`. (Partie *Externe* faite ; reste à balayer l'app : messages
+   « No installed apps found », « Everything is up to date », placeholder « Search », etc.)
+7. **Refonte des icônes** (tabler.io) : header + loupe/sync/tri/serveur/réglages + package/plus/
+   trash faits ; reste back, check, et divers, à passer en vecteurs tabler.
+8. [x] **Sources externes universelles** — **GitHub + GitLab + Codeberg**, détection auto depuis
+   l'URL (paquet `external/`, `SourceProvider`, `ExternalApi`). Onglet renommé « Externe ».
+   Migration auto de `github_apps.json` → `external_apps.json`. **Fait.**
 
 **Contraintes mainteneur (à respecter dans toute la refonte) :**
 - **Garder les 4 onglets** (Explorer / Installé / Mises à jour / Externe) + le **header** avec les

@@ -1,19 +1,19 @@
-package com.looker.droidify.compose.githubApps.navigation
+package com.looker.droidify.compose.externalApps.navigation
 
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.navOptions
-import com.looker.droidify.compose.githubApps.GithubAppsScreen
+import com.looker.droidify.compose.externalApps.ExternalAppsScreen
 import kotlinx.serialization.Serializable
 
 @Serializable
-object GithubApps
+object ExternalApps
 
-fun NavController.navigateToGithubApps() {
+fun NavController.navigateToExternalApps() {
     this.navigate(
-        GithubApps,
+        ExternalApps,
         navOptions {
             launchSingleTop = true
             restoreState = true
@@ -21,8 +21,8 @@ fun NavController.navigateToGithubApps() {
     )
 }
 
-fun NavGraphBuilder.githubApps(onBackClick: () -> Unit) {
-    composable<GithubApps> {
-        GithubAppsScreen(viewModel = hiltViewModel(), onBackClick = onBackClick)
+fun NavGraphBuilder.externalApps(onBackClick: () -> Unit) {
+    composable<ExternalApps> {
+        ExternalAppsScreen(viewModel = hiltViewModel(), onBackClick = onBackClick)
     }
 }

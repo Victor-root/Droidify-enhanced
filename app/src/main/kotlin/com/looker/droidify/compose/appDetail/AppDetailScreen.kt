@@ -37,12 +37,10 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -70,6 +68,8 @@ import com.looker.droidify.R
 import com.looker.droidify.compose.appDetail.components.CustomButtonsRow
 import com.looker.droidify.compose.appDetail.components.PackageItem
 import com.looker.droidify.compose.components.BackButton
+import com.looker.droidify.compose.components.DownloadProgressRow
+import com.looker.droidify.compose.components.InstallingRow
 import com.looker.droidify.data.model.App
 import com.looker.droidify.data.model.FilePath
 import com.looker.droidify.data.model.Package
@@ -79,6 +79,14 @@ import com.looker.droidify.data.model.selectForDevice
 import com.looker.droidify.datastore.model.CustomButton
 import com.looker.droidify.installer.model.InstallState
 import com.looker.droidify.utility.text.toAnnotatedString
+
+/**
+ * Maximum number of version rows rendered on the detail screen. The screen is a single
+ * (non-lazy) scroll column, so every row composes eagerly; a handful of apps ship hundreds
+ * of historical releases, which froze the UI. The list is sorted newest-first, so the cap
+ * keeps the releases users actually care about.
+ */
+private const val MAX_VERSIONS_SHOWN = 50
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -209,92 +217,6 @@ private fun PrimaryActions(
     }
 }
 
-/** Live download progress: a determinate bar with "12.3 MB / 45.6 MB · 2.3 MB/s · 56 %". */
-@Composable
-private fun DownloadProgressRow(
-    status: DownloadStatus,
-    onCancel: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = if (status.hasTotal) {
-                        "${status.readLabel} / ${status.totalLabel}"
-                    } else {
-                        status.readLabel
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                val trailing = buildString {
-                    status.speedLabel?.let { append(it) }
-                    if (status.hasTotal) {
-                        if (isNotEmpty()) append("  ·  ")
-                        append("${status.percent} %")
-                    }
-                }
-                if (trailing.isNotEmpty()) {
-                    Text(
-                        text = trailing,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-            val fraction = status.fraction
-            if (fraction != null) {
-                LinearProgressIndicator(
-                    progress = { fraction },
-                    modifier = Modifier.fillMaxWidth(),
-                    // No "stop indicator" dot at the end of the track (the default in M3).
-                    drawStopIndicator = {},
-                )
-            } else {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
-        }
-        TextButton(onClick = onCancel) {
-            Text(stringResource(R.string.cancel))
-        }
-    }
-}
-
-/** Shown after the download completes, while the system installer does its work. */
-@Composable
-private fun InstallingRow(
-    onCancel: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(R.string.installing),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        }
-        TextButton(onClick = onCancel) {
-            Text(stringResource(R.string.cancel))
-        }
-    }
-}
-
 @Composable
 private fun AppDetail(
     app: App,
@@ -390,10 +312,13 @@ private fun AppDetail(
         if (app.metadata.description.isNotBlank()) {
             Spacer(modifier = Modifier.height(8.dp))
             val handler = LocalUriHandler.current
+            // Parsing the HTML description is expensive; do it once per description instead of on
+            // every recomposition (the detail screen recomposes repeatedly while data loads).
+            val description = remember(app.metadata.description) {
+                app.metadata.description.toAnnotatedString(onUrlClick = { handler.openUri(it) })
+            }
             Text(
-                text = app.metadata.description.toAnnotatedString(
-                    onUrlClick = { handler.openUri(it) },
-                ),
+                text = description,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
@@ -418,7 +343,10 @@ private fun AppDetail(
 
         Spacer(modifier = Modifier.height(16.dp))
         val suggestedVersion = installablePackage?.manifest?.versionCode
-        packages.forEach { (pkg, repo) ->
+        // This screen is a single (non-lazy) scroll column, so every version row composes eagerly.
+        // Apps with many versions were composing hundreds of rows at once, freezing the UI; cap the
+        // list to the newest releases (packages are already sorted newest-first).
+        packages.take(MAX_VERSIONS_SHOWN).forEach { (pkg, repo) ->
             val isSuggested = suggestedVersion != null && pkg.manifest.versionCode == suggestedVersion
             PackageItem(
                 item = pkg,
