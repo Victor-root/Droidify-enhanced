@@ -1,19 +1,21 @@
 package com.looker.droidify.compose.appList
 
+import android.content.Context
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.looker.droidify.data.AppRepository
 import com.looker.droidify.data.InstalledRepository
-import com.looker.droidify.data.RepoRepository
 import com.looker.droidify.data.model.AppMinimal
 import com.looker.droidify.datastore.SettingsRepository
 import com.looker.droidify.datastore.get
 import com.looker.droidify.datastore.model.SortOrder
 import com.looker.droidify.sync.v2.model.DefaultName
 import com.looker.droidify.utility.common.extension.asStateFlow
+import com.looker.droidify.work.SyncWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
@@ -31,9 +33,9 @@ import javax.inject.Inject
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 class AppListViewModel @Inject constructor(
     private val appRepository: AppRepository,
-    private val repoRepository: RepoRepository,
     private val installedRepository: InstalledRepository,
     private val settingsRepository: SettingsRepository,
+    @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     val searchQuery = TextFieldState("")
@@ -144,8 +146,8 @@ class AppListViewModel @Inject constructor(
         _favouritesOnly.value = !_favouritesOnly.value
     }
 
-    private val _isSyncing = MutableStateFlow(false)
-    val isSyncing: StateFlow<Boolean> = _isSyncing
+    /** True while any sync runs (first launch, manual, repo-enable, periodic) — drives the bar. */
+    val isSyncing: StateFlow<Boolean> = SyncWorker.isSyncing(context).asStateFlow(false)
 
     /** A small "What's new" showcase (most recently added apps) for the top of the home. */
     val newApps: StateFlow<List<AppMinimal>> = catalogChanges
@@ -157,16 +159,12 @@ class AppListViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.setSortOrder(order) }
     }
 
-    /** Manually re-syncs all enabled repositories. The lists refresh automatically afterwards. */
+    /**
+     * Manually re-syncs all enabled repositories through the same worker as every other sync, so the
+     * in-app bar and the notification both show. Lists refresh automatically afterwards.
+     */
     fun sync() {
-        viewModelScope.launch {
-            _isSyncing.value = true
-            try {
-                repoRepository.syncAll()
-            } finally {
-                _isSyncing.value = false
-            }
-        }
+        SyncWorker.enqueueUserSync(context)
     }
 }
 

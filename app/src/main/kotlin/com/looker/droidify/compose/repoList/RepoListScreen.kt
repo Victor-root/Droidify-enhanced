@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconToggleButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -46,12 +47,18 @@ fun RepoListScreen(
     onBackClick: () -> Unit,
 ) {
     val repos by viewModel.stream.collectAsStateWithLifecycle()
+    val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(text = stringResource(R.string.repositories)) },
-                navigationIcon = { BackButton(onBackClick) },
-            )
+            Column {
+                TopAppBar(
+                    title = { Text(text = stringResource(R.string.repositories)) },
+                    navigationIcon = { BackButton(onBackClick) },
+                )
+                if (isSyncing) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+            }
         },
     ) { contentPadding ->
         LazyColumn(contentPadding = contentPadding) {
