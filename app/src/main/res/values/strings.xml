@@ -137,6 +137,8 @@
     <string name="light">Light</string>
     <string name="link_copied_to_clipboard">Link copied</string>
     <string name="links">Links</string>
+    <string name="issue_tracker">Issue tracker</string>
+    <string name="translation">Translation</string>
     <string name="material_you">Material You</string>
     <string name="material_you_desc">Use Material You colours</string>
     <string name="merging_FORMAT">Merging %s</string>

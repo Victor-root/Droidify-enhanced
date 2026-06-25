@@ -5,6 +5,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.looker.droidify.data.AppRepository
+import com.looker.droidify.data.InstalledRepository
 import com.looker.droidify.data.RepoRepository
 import com.looker.droidify.data.model.AppMinimal
 import com.looker.droidify.datastore.SettingsRepository
@@ -21,15 +22,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-@OptIn(FlowPreview::class)
+@OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 class AppListViewModel @Inject constructor(
     private val appRepository: AppRepository,
     private val repoRepository: RepoRepository,
-    settingsRepository: SettingsRepository,
+    private val installedRepository: InstalledRepository,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
     val searchQuery = TextFieldState("")
@@ -47,7 +51,10 @@ class AppListViewModel @Inject constructor(
 
     val sortOrderFlow = settingsRepository.get { sortOrder }.asStateFlow(SortOrder.UPDATED)
 
-    @OptIn(ExperimentalCoroutinesApi::class)
+    // Emits whenever the catalogue (apps/versions) changes — e.g. after a sync — so every list
+    // below re-queries automatically instead of waiting for the user to change a filter.
+    private val catalogChanges: StateFlow<Int> = appRepository.catalogChanges.asStateFlow(0)
+
     val appsState: StateFlow<List<AppMinimal>> = combine(
         searchQueryStream,
         selectedCategories,
@@ -55,13 +62,74 @@ class AppListViewModel @Inject constructor(
         favouritesOnly,
         favouriteApps,
     ) { searchQuery, categories, sortOrder, favOnly, favSet ->
-        val items = appRepository.apps(
-            sortOrder = sortOrder,
-            searchQuery = searchQuery,
-            categoriesToInclude = categories.toList(),
-        )
-        if (favOnly) items.filter { it.packageName.name in favSet } else items
+        AppQuery(searchQuery, categories, sortOrder, favOnly, favSet)
+    }
+        .combine(catalogChanges) { query, _ -> query }
+        .mapLatest { query ->
+            val items = appRepository.apps(
+                sortOrder = query.sortOrder,
+                searchQuery = query.search,
+                categoriesToInclude = query.categories.toList(),
+            )
+            if (query.favOnly) items.filter { it.packageName.name in query.favSet } else items
+        }
+        .asStateFlow(emptyList())
+
+    // ---- Tabs: Available / Installed / Updates ----
+
+    private val _selectedTab = MutableStateFlow(AppTab.AVAILABLE)
+    val selectedTab: StateFlow<AppTab> = _selectedTab
+
+    fun selectTab(tab: AppTab) {
+        _selectedTab.value = tab
+    }
+
+    // installed packageName -> installed versionCode (reactive to install/uninstall)
+    private val installedVersions: StateFlow<Map<String, Long>> = installedRepository
+        .getAllStream()
+        .map { items -> items.associate { it.packageName to it.versionCode } }
+        .asStateFlow(emptyMap())
+
+    // appId -> latest available versionCode (re-queried whenever the catalogue changes)
+    private val suggestedVersions: StateFlow<Map<Int, Long>> = catalogChanges
+        .mapLatest { appRepository.suggestedVersionCodes() }
+        .asStateFlow(emptyMap())
+
+    /**
+     * Apps shown for the current tab. Search / sort / category / favourites filters are already
+     * applied by [appsState]; this only narrows the list to the selected tab.
+     */
+    val displayedApps: StateFlow<List<AppMinimal>> = combine(
+        appsState,
+        _selectedTab,
+        installedVersions,
+        suggestedVersions,
+    ) { apps, tab, installed, suggested ->
+        when (tab) {
+            AppTab.AVAILABLE -> apps
+            AppTab.INSTALLED -> apps.filter { it.packageName.name in installed }
+            AppTab.UPDATES -> apps.filter { hasUpdate(it, installed, suggested) }
+        }
     }.asStateFlow(emptyList())
+
+    /** Number of installed apps with an available update (shown on the Updates tab). */
+    val updatesCount: StateFlow<Int> = combine(
+        appsState,
+        installedVersions,
+        suggestedVersions,
+    ) { apps, installed, suggested ->
+        apps.count { hasUpdate(it, installed, suggested) }
+    }.asStateFlow(0)
+
+    private fun hasUpdate(
+        app: AppMinimal,
+        installed: Map<String, Long>,
+        suggested: Map<Int, Long>,
+    ): Boolean {
+        val installedCode = installed[app.packageName.name] ?: return false
+        val latestCode = suggested[app.appId.toInt()] ?: return false
+        return latestCode > installedCode
+    }
 
     fun toggleCategory(category: DefaultName) {
         val currentCategories = _selectedCategories.value
@@ -79,7 +147,17 @@ class AppListViewModel @Inject constructor(
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing
 
-    /** Manually re-syncs all enabled repositories, refreshing the app catalog. */
+    /** A small "What's new" showcase (most recently added apps) for the top of the home. */
+    val newApps: StateFlow<List<AppMinimal>> = catalogChanges
+        .mapLatest { appRepository.apps(sortOrder = SortOrder.ADDED).take(NEW_APPS_COUNT) }
+        .asStateFlow(emptyList())
+
+    /** Persists the chosen sort order; [appsState] re-queries automatically. */
+    fun setSortOrder(order: SortOrder) {
+        viewModelScope.launch { settingsRepository.setSortOrder(order) }
+    }
+
+    /** Manually re-syncs all enabled repositories. The lists refresh automatically afterwards. */
     fun sync() {
         viewModelScope.launch {
             _isSyncing.value = true
@@ -91,3 +169,15 @@ class AppListViewModel @Inject constructor(
         }
     }
 }
+
+private const val NEW_APPS_COUNT = 12
+
+private data class AppQuery(
+    val search: String,
+    val categories: Set<DefaultName>,
+    val sortOrder: SortOrder,
+    val favOnly: Boolean,
+    val favSet: Set<String>,
+)
+
+enum class AppTab { AVAILABLE, INSTALLED, UPDATES }

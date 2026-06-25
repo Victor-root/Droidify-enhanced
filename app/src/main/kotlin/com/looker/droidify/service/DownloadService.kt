@@ -7,7 +7,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.net.toUri
 import com.looker.droidify.BuildConfig
-import com.looker.droidify.MainActivity
+import com.looker.droidify.compose.MainComposeActivity
 import com.looker.droidify.R.string.connection_error_DESC
 import com.looker.droidify.R.string.could_not_download_FORMAT
 import com.looker.droidify.R.string.could_not_validate_FORMAT
@@ -253,7 +253,7 @@ class DownloadService : ConnectionService<DownloadService.Binder>() {
         titleRes: Int,
         description: String?,
     ) {
-        val intent = Intent(this, MainActivity::class.java)
+        val intent = Intent(this, MainComposeActivity::class.java)
             .setAction(Intent.ACTION_VIEW)
             .setData("package:${task.packageName}".toUri())
             .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
@@ -275,10 +275,10 @@ class DownloadService : ConnectionService<DownloadService.Binder>() {
     }
 
     private fun showNotificationInstall(task: Task) {
-        val intent = Intent(this, MainActivity::class.java)
-            .setAction(MainActivity.ACTION_INSTALL)
+        val intent = Intent(this, MainComposeActivity::class.java)
+            .setAction(MainComposeActivity.ACTION_INSTALL)
             .setData("package:${task.packageName}".toUri())
-            .putExtra(MainActivity.EXTRA_CACHE_FILE_NAME, task.release.cacheFileName)
+            .putExtra(MainComposeActivity.EXTRA_CACHE_FILE_NAME, task.release.cacheFileName)
             .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             .toPendingIntent(this)
         val notification = createInstallNotification(
@@ -367,7 +367,7 @@ class DownloadService : ConnectionService<DownloadService.Binder>() {
                 .setContentTitle(getString(stringRes.updates))
                 .setContentText(getString(stringRes.tap_to_resume_updates))
                 .setContentIntent(
-                    Intent(this, MainActivity::class.java)
+                    Intent(this, MainComposeActivity::class.java)
                         .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         .toPendingIntent(this),
                 )
@@ -426,7 +426,7 @@ class DownloadService : ConnectionService<DownloadService.Binder>() {
     }
 
     private fun createNotificationIntent(packageName: String): PendingIntent? =
-        Intent(this, MainActivity::class.java)
+        Intent(this, MainComposeActivity::class.java)
             .setAction(Intent.ACTION_VIEW)
             .setData("package:$packageName".toUri())
             .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

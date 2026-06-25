@@ -15,6 +15,8 @@ import com.looker.droidify.data.model.Package
 import com.looker.droidify.data.model.PackageName
 import com.looker.droidify.data.model.Repo
 import com.looker.droidify.datastore.CustomButtonRepository
+import com.looker.droidify.datastore.SettingsRepository
+import com.looker.droidify.datastore.get
 import com.looker.droidify.datastore.model.CustomButton
 import com.looker.droidify.installer.InstallManager
 import com.looker.droidify.installer.model.InstallState
@@ -45,6 +47,7 @@ class AppDetailViewModel @Inject constructor(
     private val appRepository: AppRepository,
     private val repoRepository: RepoRepository,
     private val customButtonRepository: CustomButtonRepository,
+    private val settingsRepository: SettingsRepository,
     private val installManager: InstallManager,
     private val downloader: Downloader,
     @param:ApplicationContext private val context: Context,
@@ -62,6 +65,16 @@ class AppDetailViewModel @Inject constructor(
     val installState: StateFlow<InstallState?> = installManager.state
         .map { it[PackageName(packageName)] }
         .asStateFlow(null)
+
+    /** Whether this app is in the user's favourites. */
+    val isFavourite: StateFlow<Boolean> = settingsRepository.get { favouriteApps }
+        .map { packageName in it }
+        .asStateFlow(false)
+
+    /** Adds or removes this app from the user's favourites. */
+    fun toggleFavourite() {
+        viewModelScope.launch { appRepository.addToFavourite(PackageName(packageName)) }
+    }
 
     private val _downloadStatus = MutableStateFlow<DownloadStatus?>(null)
 

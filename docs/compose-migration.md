@@ -7,20 +7,22 @@
 
 ## État des lieux (audit du code existant)
 
-Les développeurs d'origine ont commencé une réécriture Compose en parallèle
-(`compose/` + `MainComposeActivity` avec une navigation complète), mais elle
-n'est **ni terminée ni activée** : l'app livrée tourne encore entièrement sur
-l'ancien système (`MainActivity` + Fragments).
+L'app tourne désormais **entièrement sur Compose** (`MainComposeActivity` est le
+lanceur **et** le gestionnaire de deeplinks). L'**ancienne interface Views a été
+supprimée** (`MainActivity`, tout `ui/`, `widget/`, `CursorOwner`). Il reste à
+unifier la **couche données** : une ancienne base + une ancienne synchro
+héritées sont encore utilisées par la tuyauterie (sync / install / prefs) en
+parallèle de la nouvelle base Room.
 
 | Zone | État Compose | Manques principaux |
 |------|--------------|--------------------|
 | Réglages | ✅ Fini (déjà actif) | — (sélecteur de couleur déjà ajouté) |
 | Dépôts (liste/détail/édition) | 🟡 ~80% | bouton "Ajouter un dépôt", choix de miroir, collage presse-papier, nb d'apps |
-| Accueil / navigation d'apps | 🟠 ~40% | onglets (Dispo/Installées/MàJ), recherche, tri, synchro, filtre par dépôt, états vides |
-| Détail d'app | 🟡 ~55% | menus de la barre, permissions, liens, changelog, dons, anti-fonctionnalités, favori (installer/MàJ/lancer/désinstaller ✅) |
+| Accueil / navigation d'apps | 🟢 ~80% | filtre par dépôt, bouton "tout mettre à jour" (onglets ✅, recherche/tri ✅, états vides ✅, refresh auto après synchro ✅) |
+| Détail d'app | 🟡 ~75% | menus de la barre, description déroulante, anti-fonctionnalités (installer/MàJ/lancer/désinstaller ✅, favori ✅, changelog ✅, permissions ✅, liens ✅, captures plein écran ✅) |
 | Favoris | ❌ Absent | écran dédié à créer |
 | Dialogues (permissions, incompatibilité) | ❌ Absent | à porter |
-| Coquille (`MainComposeActivity`) | 🔴 Incomplète | **flux d'installation**, **deeplinks/intents**, **couleur d'accentuation**, recréation au changement de thème |
+| Coquille (`MainComposeActivity`) | 🟢 ~85% | reste : pré-remplissage deeplink (recherche/adresse) + intents internes notifs (install/MàJ) ; flux install ✅, deeplinks externes ✅, couleur ✅, recréation thème ✅ |
 
 ## Feuille de route
 
@@ -28,22 +30,27 @@ l'ancien système (`MainActivity` + Fragments).
 - [x] Porter le thème + couleur d'accentuation (DynamicColors) dans `MainComposeActivity`
 - [x] Faire de `MainComposeActivity` le lanceur de l'app (l'app ouvre directement Compose)
 - [x] Brancher le flux d'installation/désinstallation (`InstallManager`)
-- [ ] Gérer les intents/deeplinks (installer, voir une app, recherche, ajouter un dépôt)
+- [~] Gérer les intents/deeplinks : **voir une app** ✅ (lien f-droid / `market://` / `fdroid.app` → fiche Compose), **ajouter un dépôt** (`fdroidrepo://`) → formulaire, recherche → accueil. Les filtres d'intent sont passés de `MainActivity` à `MainComposeActivity`. Reste : pré-remplir l'adresse/la recherche, et les intents **internes** des notifs (install/MàJ) — à finir en supprimant `MainActivity`.
 - **Testable :** lancer l'app Compose, vérifier thème/couleur, et que les liens externes ouvrent le bon écran.
 
 ### Phase 1 — Accueil / navigation (+ redesign)
-- [ ] Onglets Disponibles / Installées / Mises à jour
-- [ ] Recherche, tri, synchro (+ barre de progression), filtre par dépôt
-- [ ] États vides/chargement, bouton "remonter en haut", "tout mettre à jour"
-- [ ] Redesign — **direction choisie : accueil "magasin" unifié** (sections en vitrine : nouveautés, mises à jour dispo, catégories mises en avant ; recherche proéminente)
+- [x] **Onglets Disponibles / Installées / Mises à jour** — l'onglet MàJ affiche un compteur ; détection des mises à jour en comparant la version installée à la dernière version dispo (versionCode)
+- [x] Recherche + **tri** (menu déroulant fonctionnel, persiste le choix) + synchro (+ barre de progression)
+- [ ] Filtre par dépôt
+- [~] États vides (onglets Installées/MàJ ✅), bouton "remonter en haut", "tout mettre à jour"
+- [x] **Rafraîchir après une synchro** : la liste, le carrousel « What's new » et le compteur de mises à jour se mettent à jour **tout seuls** après une synchro (et après une install/désinstall), via un signal réactif Room sur les tables `app`/`version`. Plus besoin de changer un filtre pour voir les nouveautés.
+- [~] Redesign **accueil "magasin" unifié** : 1re vitrine en place (carrousel « What's new » / nouveautés en haut de l'accueil). Reste : section « mises à jour dispo », catégories mises en avant.
 - **Testable :** parcourir, chercher, trier, synchroniser depuis l'accueil Compose.
 
 ### Phase 2 — Détail d'app (parité complète)
 - [x] **2a** — Bouton d'action (états Installer/MàJ/Lancer/Désinstaller/Annuler) + **Lancer** + **Désinstaller** — ✅ validé sur téléphone
 - [x] **2b** — **Téléchargement + installation** (le bouton télécharge, vérifie le hash SHA-256, puis installe) — branché directement via `Downloader` + `InstallManager` (sans passer par `DownloadService`). **Vraie barre de progression** : Mo téléchargés / total, vitesse en Mo/s et %, bouton Annuler. Manque : téléchargement en arrière-plan (notification) + reprise.
 - [ ] Actions de la barre (partager, source, infos, désinstaller)
-- [ ] Sections : captures (+ vidéo + plein écran), description (déroulante), changelog, anti-fonctionnalités, permissions, liens, dons, liste des versions
-- [ ] Bouton favori, interrupteurs "ignorer les mises à jour"
+- [x] Sections : **changelog (What's new)**, **permissions** (dépliable, avec compteur), **liens** (site / source / suivi de bugs / changelog / traduction / dons / site de l'auteur) — tout depuis les données déjà chargées
+- [x] Captures en **plein écran** : visionneuse balayable (HorizontalPager, fond noir, bouton fermer)
+- [ ] Sections restantes : vidéo, description **déroulante**, anti-fonctionnalités (données pas encore peuplées côté data), liste des versions (déjà affichée en brut)
+- [x] **Bouton favori** (persiste dans les réglages)
+- [ ] Interrupteurs "ignorer les mises à jour"
 - **➡️ Compose est déjà le lanceur** (bascule faite en phase 0) ; cette phase le rend pleinement utilisable (parcourir + installer).
 - **Testable :** installer/mettre à jour/lancer de vraies apps depuis Compose.
 
@@ -61,7 +68,9 @@ l'ancien système (`MainActivity` + Fragments).
 - [ ] Picker à onglets conforme au screenshot
 
 ### Phase 6 — Suppression de l'ancien système
-- [ ] Supprimer les Fragments `ui/`, adaptateurs, layouts XML, anciens styles/thème, `MainActivity`, viewBinding
+- [x] **Supprimer l'ancienne UI Views** : `MainActivity`, tout `ui/` (21 fichiers), `widget/` (5), `CursorOwner`, l'extension `Fragment.mainActivity` — supprimés ; entrée manifest retirée ; notifs + deeplinks repointés sur Compose.
+- [ ] Supprimer les **layouts XML** (21) + ressources héritées (menus / animators / styles) devenues inutilisées
+- [ ] **Unifier la couche données** : faire passer sync / install / `ProductPreferences` / export-import de dépôts sur la base **Room**, puis supprimer l'ancienne `database/` + l'ancienne synchro (`SyncService`, `RepositoryUpdater`)
 - [ ] Nettoyage final + élagage des dépendances inutilisées
 
 ## Stratégie (choix du mainteneur)

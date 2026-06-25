@@ -253,8 +253,8 @@ fun DroidifyTheme(
         }
 
         // The activity theme is recolored from the user's chosen accent color at runtime
-        // (see MainActivity.applyAccentColor); read it back so Compose stays in sync with the
-        // classic View screens.
+        // (see MainComposeActivity.applyAccentColor); read it back so Compose follows the
+        // generated palette.
         else -> context.toComposeColorScheme(if (darkTheme) darkScheme else lightScheme)
     }
 

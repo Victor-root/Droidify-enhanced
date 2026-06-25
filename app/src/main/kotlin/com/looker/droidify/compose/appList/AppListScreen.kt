@@ -36,8 +36,11 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
@@ -49,6 +52,8 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -63,13 +68,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.looker.droidify.R
 import com.looker.droidify.data.model.AppMinimal
+import com.looker.droidify.datastore.extension.sortOrderName
+import com.looker.droidify.datastore.model.SortOrder
+import com.looker.droidify.datastore.model.supportedSortOrders
 import com.looker.droidify.sync.v2.model.DefaultName
 
 @Composable
@@ -79,11 +90,15 @@ fun AppListScreen(
     onNavigateToRepos: () -> Unit,
     onNavigateToSettings: () -> Unit,
 ) {
-    val apps by viewModel.appsState.collectAsStateWithLifecycle()
+    val apps by viewModel.displayedApps.collectAsStateWithLifecycle()
     val selectedCategories by viewModel.selectedCategories.collectAsState()
 
     val availableCategories by viewModel.categories.collectAsStateWithLifecycle()
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
+    val newApps by viewModel.newApps.collectAsStateWithLifecycle()
+    val sortOrder by viewModel.sortOrderFlow.collectAsStateWithLifecycle()
+    val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
+    val updatesCount by viewModel.updatesCount.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
     Scaffold(
@@ -93,9 +108,16 @@ fun AppListScreen(
                     onSync = viewModel::sync,
                     onNavigateToRepos = onNavigateToRepos,
                     onNavigateToSettings = onNavigateToSettings,
+                    currentSort = sortOrder,
+                    onSortSelected = viewModel::setSortOrder,
                     title = {
                         Text("Droid-ify")
                     },
+                )
+                AppTabRow(
+                    selectedTab = selectedTab,
+                    updatesCount = updatesCount,
+                    onSelectTab = viewModel::selectTab,
                 )
                 if (isSyncing) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -107,6 +129,11 @@ fun AppListScreen(
             state = listState,
             contentPadding = contentPadding,
         ) {
+            if (selectedTab == AppTab.AVAILABLE && newApps.isNotEmpty()) {
+                item(key = "new-apps-showcase") {
+                    NewAppsShowcase(apps = newApps, onAppClick = onAppClick)
+                }
+            }
             stickyHeader {
                 Column(modifier = Modifier.background(MaterialTheme.colorScheme.background)) {
                     Spacer(Modifier.height(8.dp))
@@ -132,6 +159,11 @@ fun AppListScreen(
                     }
                 }
             }
+            if (apps.isEmpty() && selectedTab != AppTab.AVAILABLE) {
+                item(key = "empty-tab") {
+                    EmptyTabMessage(tab = selectedTab)
+                }
+            }
             items(
                 items = apps,
                 key = { it.appId },
@@ -143,6 +175,57 @@ fun AppListScreen(
                 )
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AppTabRow(
+    selectedTab: AppTab,
+    updatesCount: Int,
+    onSelectTab: (AppTab) -> Unit,
+) {
+    TabRow(selectedTabIndex = selectedTab.ordinal) {
+        AppTab.entries.forEach { tab ->
+            Tab(
+                selected = tab == selectedTab,
+                onClick = { onSelectTab(tab) },
+                text = {
+                    val label = when (tab) {
+                        AppTab.AVAILABLE -> stringResource(R.string.available)
+                        AppTab.INSTALLED -> stringResource(R.string.installed)
+                        AppTab.UPDATES -> if (updatesCount > 0) {
+                            "${stringResource(R.string.updates)} ($updatesCount)"
+                        } else {
+                            stringResource(R.string.updates)
+                        }
+                    }
+                    Text(label)
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyTabMessage(tab: AppTab) {
+    val message = when (tab) {
+        AppTab.INSTALLED -> "No installed apps found"
+        AppTab.UPDATES -> "Everything is up to date"
+        AppTab.AVAILABLE -> ""
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(32.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
@@ -225,9 +308,12 @@ private fun AppListTopBar(
     onSync: () -> Unit,
     onNavigateToRepos: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    currentSort: SortOrder,
+    onSortSelected: (SortOrder) -> Unit,
     title: @Composable () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     TopAppBar(
         title = title,
         actions = {
@@ -238,11 +324,32 @@ private fun AppListTopBar(
                 Icon(Icons.Filled.Sync, contentDescription = "Sync")
             }
             Spacer(Modifier.width(4.dp))
-            IconButton(
-                onClick = { expanded = true },
-                modifier = Modifier.size(smallContainerSize(Narrow)),
-            ) {
-                Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort")
+            Box {
+                IconButton(
+                    onClick = { expanded = true },
+                    modifier = Modifier.size(smallContainerSize(Narrow)),
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort")
+                }
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                ) {
+                    supportedSortOrders().forEach { order ->
+                        DropdownMenuItem(
+                            text = { Text(context.sortOrderName(order)) },
+                            onClick = {
+                                onSortSelected(order)
+                                expanded = false
+                            },
+                            trailingIcon = if (order == currentSort) {
+                                { Icon(Icons.Filled.Check, contentDescription = null) }
+                            } else {
+                                null
+                            },
+                        )
+                    }
+                }
             }
             Spacer(Modifier.width(4.dp))
             IconButton(
@@ -275,6 +382,84 @@ private fun CategoryChip(
         onClick = onToggle,
         label = { Text(category) },
     )
+}
+
+/** Horizontal "What's new" showcase shown at the top of the home. */
+@Composable
+private fun NewAppsShowcase(
+    apps: List<AppMinimal>,
+    onAppClick: (String) -> Unit,
+) {
+    Column(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)) {
+        Text(
+            text = stringResource(R.string.whats_new),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(items = apps, key = { it.appId }) { app ->
+                ShowcaseCard(
+                    app = app,
+                    onClick = { onAppClick(app.packageName.name) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShowcaseCard(
+    app: AppMinimal,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .width(88.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        var icon by remember(app.appId) { mutableStateOf(app.icon?.path) }
+        if (icon != null) {
+            AsyncImage(
+                model = icon,
+                onError = { icon = app.fallbackIcon?.path },
+                contentDescription = null,
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(MaterialTheme.shapes.medium),
+            )
+        } else {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(64.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        shape = MaterialTheme.shapes.medium,
+                    ),
+            ) {
+                Image(
+                    painter = painterResource(android.R.mipmap.sym_def_app_icon),
+                    contentDescription = null,
+                    modifier = Modifier.padding(8.dp),
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = app.name,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 }
 
 @Composable
