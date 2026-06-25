@@ -30,6 +30,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -58,7 +59,7 @@ class ExternalAppsViewModel @Inject constructor(
         apps.filter { app -> app.packageName?.let { isInstalled(it) } == true }
             .map { it.key }
             .toSet()
-    }.flowOn(Dispatchers.Default).asStateFlow(emptySet())
+    }.distinctUntilChanged().flowOn(Dispatchers.Default).asStateFlow(emptySet())
 
     /** Per-app system install state (Pending/Installing/…), keyed by [ExternalApp.key]. */
     val installStates: StateFlow<Map<String, InstallState>> = combine(
@@ -70,7 +71,7 @@ class ExternalAppsViewModel @Inject constructor(
             val state = states[PackageName(pkg)] ?: return@mapNotNull null
             app.key to state
         }.toMap()
-    }.asStateFlow(emptyMap())
+    }.distinctUntilChanged().flowOn(Dispatchers.Default).asStateFlow(emptyMap())
 
     /** Live download progress per app (drives the per-card progress bar). */
     private val _downloads = MutableStateFlow<Map<String, DownloadStatus>>(emptyMap())

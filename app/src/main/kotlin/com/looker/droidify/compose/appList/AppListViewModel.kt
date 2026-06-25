@@ -16,6 +16,7 @@ import com.looker.droidify.utility.common.extension.asStateFlow
 import com.looker.droidify.work.SyncWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
@@ -75,6 +77,10 @@ class AppListViewModel @Inject constructor(
             )
             if (query.favOnly) items.filter { it.packageName.name in query.favSet } else items
         }
+        // Off the main thread, and skip re-emitting an identical list (the catalogue flow fires
+        // repeatedly during a sync) so the grid doesn't needlessly re-diff and re-animate.
+        .distinctUntilChanged()
+        .flowOn(Dispatchers.Default)
         .asStateFlow(emptyList())
 
     // ---- Tabs: Available / Installed / Updates ----
@@ -90,11 +96,15 @@ class AppListViewModel @Inject constructor(
     private val installedVersions: StateFlow<Map<String, Long>> = installedRepository
         .getAllStream()
         .map { items -> items.associate { it.packageName to it.versionCode } }
+        .distinctUntilChanged()
+        .flowOn(Dispatchers.Default)
         .asStateFlow(emptyMap())
 
     // appId -> latest available versionCode (re-queried whenever the catalogue changes)
     private val suggestedVersions: StateFlow<Map<Int, Long>> = catalogChanges
         .mapLatest { appRepository.suggestedVersionCodes() }
+        .distinctUntilChanged()
+        .flowOn(Dispatchers.Default)
         .asStateFlow(emptyMap())
 
     /**
@@ -114,7 +124,7 @@ class AppListViewModel @Inject constructor(
             // The External tab renders its own (non-F-Droid) list, so the catalogue list is empty.
             AppTab.EXTERNAL -> emptyList()
         }
-    }.asStateFlow(emptyList())
+    }.distinctUntilChanged().flowOn(Dispatchers.Default).asStateFlow(emptyList())
 
     /** Number of installed apps with an available update (shown on the Updates tab). */
     val updatesCount: StateFlow<Int> = combine(
@@ -123,7 +133,7 @@ class AppListViewModel @Inject constructor(
         suggestedVersions,
     ) { apps, installed, suggested ->
         apps.count { hasUpdate(it, installed, suggested) }
-    }.asStateFlow(0)
+    }.distinctUntilChanged().flowOn(Dispatchers.Default).asStateFlow(0)
 
     private fun hasUpdate(
         app: AppMinimal,
@@ -154,6 +164,8 @@ class AppListViewModel @Inject constructor(
     /** A small "What's new" showcase (most recently added apps) for the top of the home. */
     val newApps: StateFlow<List<AppMinimal>> = catalogChanges
         .mapLatest { appRepository.apps(sortOrder = SortOrder.ADDED).take(NEW_APPS_COUNT) }
+        .distinctUntilChanged()
+        .flowOn(Dispatchers.Default)
         .asStateFlow(emptyList())
 
     /** Persists the chosen sort order; [appsState] re-queries automatically. */

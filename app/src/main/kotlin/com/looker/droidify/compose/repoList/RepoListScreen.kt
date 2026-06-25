@@ -73,7 +73,7 @@ fun RepoListScreen(
         },
     ) { contentPadding ->
         LazyColumn(contentPadding = contentPadding) {
-            items(repos) { repo ->
+            items(repos, key = { it.id }) { repo ->
                 RepoItem(
                     onClick = { onRepoClick(repo.id) },
                     onToggle = { viewModel.toggleRepo(repo) },
