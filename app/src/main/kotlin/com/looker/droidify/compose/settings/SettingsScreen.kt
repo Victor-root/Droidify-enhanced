@@ -178,17 +178,6 @@ fun SettingsScreen(
                 )
             }
 
-            if (SdkCheck.isSnowCake) {
-                item {
-                    SwitchSettingItem(
-                        title = stringResource(R.string.material_you),
-                        description = stringResource(R.string.material_you_desc),
-                        checked = settings.dynamicTheme,
-                        onCheckedChange = viewModel::setDynamicTheme,
-                    )
-                }
-            }
-
             item {
                 SwitchSettingItem(
                     title = stringResource(R.string.home_screen_swiping),

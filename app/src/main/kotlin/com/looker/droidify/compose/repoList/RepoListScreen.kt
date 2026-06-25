@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Code
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconToggleButton
 import androidx.compose.material3.Icon
@@ -31,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,7 +59,10 @@ fun RepoListScreen(
                     navigationIcon = { BackButton(onBackClick) },
                     actions = {
                         IconButton(onClick = onNavigateToGithubApps) {
-                            Icon(Icons.Default.Code, contentDescription = "GitHub apps")
+                            Icon(
+                                painterResource(R.drawable.ic_tabler_package),
+                                contentDescription = "GitHub apps",
+                            )
                         }
                     },
                 )

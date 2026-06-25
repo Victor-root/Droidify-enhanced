@@ -27,19 +27,28 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -66,6 +75,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -98,15 +108,13 @@ fun AppListScreen(
     onNavigateToSettings: () -> Unit,
 ) {
     val apps by viewModel.displayedApps.collectAsStateWithLifecycle()
-    val selectedCategories by viewModel.selectedCategories.collectAsState()
-
-    val availableCategories by viewModel.categories.collectAsStateWithLifecycle()
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
     val newApps by viewModel.newApps.collectAsStateWithLifecycle()
     val sortOrder by viewModel.sortOrderFlow.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val updatesCount by viewModel.updatesCount.collectAsStateWithLifecycle()
-    val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
+    var searchExpanded by rememberSaveable { mutableStateOf(false) }
 
     // The GitHub tab is backed by its own ViewModel (Obtainium-style sources). Adding sources lives
     // on the Repos screen; here we only browse and install/update them.
@@ -123,6 +131,11 @@ fun AppListScreen(
             Column {
                 AppListTopBar(
                     onSync = viewModel::sync,
+                    searchExpanded = searchExpanded,
+                    onToggleSearch = {
+                        searchExpanded = !searchExpanded
+                        if (!searchExpanded) viewModel.searchQuery.clearText()
+                    },
                     onNavigateToRepos = onNavigateToRepos,
                     onNavigateToSettings = onNavigateToSettings,
                     currentSort = sortOrder,
@@ -136,62 +149,45 @@ fun AppListScreen(
                     updatesCount = updatesCount,
                     onSelectTab = viewModel::selectTab,
                 )
+                if (searchExpanded) {
+                    Spacer(Modifier.height(8.dp))
+                    SearchBar(state = viewModel.searchQuery)
+                    Spacer(Modifier.height(8.dp))
+                }
                 if (isSyncing) {
                     SyncBanner()
                 }
             }
         },
     ) { contentPadding ->
-        LazyColumn(
-            state = listState,
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            state = gridState,
             contentPadding = contentPadding,
         ) {
             if (selectedTab == AppTab.GITHUB) {
                 if (githubApps.isEmpty()) {
-                    item(key = "github-empty") { GithubTabEmpty() }
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "github-empty") {
+                        GithubTabEmpty()
+                    }
                 }
                 items(items = githubApps, key = { it.key }) { app ->
-                    GithubTabItem(
+                    GithubAppCard(
                         app = app,
                         busy = app.key in githubBusy,
                         onAction = { githubViewModel.installOrUpdate(app) },
                         modifier = Modifier.animateItem(),
                     )
                 }
-                return@LazyColumn
+                return@LazyVerticalGrid
             }
             if (selectedTab == AppTab.AVAILABLE && newApps.isNotEmpty()) {
-                item(key = "new-apps-showcase") {
+                item(span = { GridItemSpan(maxLineSpan) }, key = "new-apps-showcase") {
                     NewAppsShowcase(apps = newApps, onAppClick = onAppClick)
                 }
             }
-            stickyHeader {
-                Column(modifier = Modifier.background(MaterialTheme.colorScheme.background)) {
-                    Spacer(Modifier.height(8.dp))
-                    SearchBar(state = viewModel.searchQuery)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                    ) {
-                        val favSelected by viewModel.favouritesOnly.collectAsStateWithLifecycle()
-                        FilterChip(
-                            selected = favSelected,
-                            onClick = { viewModel.toggleFavouritesOnly() },
-                            label = { Text("Favourites") },
-                        )
-                    }
-                    CategoriesList(availableCategories) { category ->
-                        CategoryChip(
-                            category = category,
-                            selected = category in selectedCategories,
-                            onToggle = { viewModel.toggleCategory(category) },
-                        )
-                    }
-                }
-            }
             if (apps.isEmpty() && selectedTab != AppTab.AVAILABLE) {
-                item(key = "empty-tab") {
+                item(span = { GridItemSpan(maxLineSpan) }, key = "empty-tab") {
                     EmptyTabMessage(tab = selectedTab)
                 }
             }
@@ -199,7 +195,7 @@ fun AppListScreen(
                 items = apps,
                 key = { it.appId },
             ) { app ->
-                AppItem(
+                AppCard(
                     app = app,
                     onClick = { onAppClick(app.packageName.name) },
                     modifier = Modifier.animateItem(),
@@ -246,8 +242,8 @@ private fun AppTabRow(
 @Composable
 private fun SyncBanner() {
     Surface(
-        color = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Row(
             modifier = Modifier
@@ -259,7 +255,7 @@ private fun SyncBanner() {
             CircularProgressIndicator(
                 modifier = Modifier.size(18.dp),
                 strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 text = stringResource(R.string.syncing),
@@ -369,6 +365,8 @@ fun CategoriesList(
 @Composable
 private fun AppListTopBar(
     onSync: () -> Unit,
+    searchExpanded: Boolean,
+    onToggleSearch: () -> Unit,
     onNavigateToRepos: () -> Unit,
     onNavigateToSettings: () -> Unit,
     currentSort: SortOrder,
@@ -381,10 +379,22 @@ private fun AppListTopBar(
         title = title,
         actions = {
             IconButton(
+                onClick = onToggleSearch,
+                modifier = Modifier.size(smallContainerSize(Narrow)),
+            ) {
+                Icon(
+                    painterResource(
+                        if (searchExpanded) R.drawable.ic_tabler_x else R.drawable.ic_tabler_search,
+                    ),
+                    contentDescription = "Search",
+                )
+            }
+            Spacer(Modifier.width(4.dp))
+            IconButton(
                 onClick = onSync,
                 modifier = Modifier.size(smallContainerSize(Narrow)),
             ) {
-                Icon(Icons.Filled.Sync, contentDescription = "Sync")
+                Icon(painterResource(R.drawable.ic_tabler_refresh), contentDescription = "Sync")
             }
             Spacer(Modifier.width(4.dp))
             Box {
@@ -392,7 +402,7 @@ private fun AppListTopBar(
                     onClick = { expanded = true },
                     modifier = Modifier.size(smallContainerSize(Narrow)),
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort")
+                    Icon(painterResource(R.drawable.ic_tabler_sort), contentDescription = "Sort")
                 }
                 DropdownMenu(
                     expanded = expanded,
@@ -419,14 +429,14 @@ private fun AppListTopBar(
                 onClick = onNavigateToRepos,
                 modifier = Modifier.size(smallContainerSize(Narrow)),
             ) {
-                Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Repos")
+                Icon(painterResource(R.drawable.ic_tabler_server), contentDescription = "Repos")
             }
             Spacer(Modifier.width(4.dp))
             IconButton(
                 onClick = onNavigateToSettings,
                 modifier = Modifier.size(smallContainerSize(Narrow)),
             ) {
-                Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                Icon(painterResource(R.drawable.ic_tabler_settings), contentDescription = "Settings")
             }
             Spacer(Modifier.width(4.dp))
         },
@@ -525,128 +535,133 @@ private fun ShowcaseCard(
     }
 }
 
+/** A catalogue app as a grid card: large icon, name, summary and version — neutral colours, no
+ *  accent tint. Tapping opens the detail screen (install happens there). */
 @Composable
-private fun AppItem(
+private fun AppCard(
     app: AppMinimal,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
+    Card(
+        modifier = modifier
             .fillMaxWidth()
-            .height(80.dp)
-            .clickable(onClick = onClick)
-            .padding(vertical = 12.dp)
-            .then(modifier),
+            .padding(6.dp)
+            .clickable(onClick = onClick),
     ) {
-        Spacer(modifier = Modifier.size(12.dp))
-        var icon by remember { mutableStateOf(app.icon?.path) }
-        if (icon != null) {
-            AsyncImage(
-                model = icon,
-                onError = { icon = app.fallbackIcon?.path },
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .aspectRatio(1F, true)
-                    .clip(MaterialTheme.shapes.small),
-            )
-        } else {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .aspectRatio(1F, true)
-                    .background(
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        shape = MaterialTheme.shapes.small,
-                    ),
-            ) {
-                Image(
-                    painter = painterResource(android.R.mipmap.sym_def_app_icon),
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            var icon by remember(app.appId) { mutableStateOf(app.icon?.path) }
+            if (icon != null) {
+                AsyncImage(
+                    model = icon,
+                    onError = { icon = app.fallbackIcon?.path },
                     contentDescription = null,
-                    modifier = Modifier.padding(8.dp),
-                )
-            }
-        }
-        Spacer(modifier = Modifier.size(12.dp))
-        Column(modifier = Modifier.weight(1F)) {
-            Row {
-                val (versionColor, backgroundColor) = app.versionColors()
-                Text(
-                    text = app.name,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1F),
-                )
-                Text(
-                    text = app.suggestedVersion,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = versionColor,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
                     modifier = Modifier
-                        .wrapContentHeight()
-                        .widthIn(max = 96.dp)
-                        .background(color = backgroundColor, shape = MaterialTheme.shapes.small)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .size(64.dp)
+                        .clip(MaterialTheme.shapes.medium),
                 )
+            } else {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(64.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            shape = MaterialTheme.shapes.medium,
+                        ),
+                ) {
+                    Image(
+                        painter = painterResource(android.R.mipmap.sym_def_app_icon),
+                        contentDescription = null,
+                        modifier = Modifier.padding(8.dp),
+                    )
+                }
             }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = app.name,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
             app.summary?.let {
+                Spacer(Modifier.height(2.dp))
                 Text(
                     text = it,
-                    overflow = TextOverflow.Ellipsis,
-                    maxLines = 2,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = app.suggestedVersion,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
         }
-        Spacer(modifier = Modifier.size(12.dp))
     }
 }
 
+/** A tracked external-source app on the GitHub tab, as a grid card with an install/update action. */
 @Composable
-fun AppMinimal.versionColors(): Pair<Color, Color> {
-    val scheme = MaterialTheme.colorScheme
-    return scheme.outline to scheme.background
-}
-
-/** A tracked GitHub-source app on the GitHub tab: name, install state, and an install/update action. */
-@Composable
-private fun GithubTabItem(
+private fun GithubAppCard(
     app: GithubApp,
     busy: Boolean,
     onAction: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
+    Card(
+        modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-            .then(modifier),
+            .padding(6.dp),
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = app.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = app.label,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(2.dp))
             Text(
                 text = app.tabStatusLine(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
             )
-        }
-        Spacer(Modifier.width(8.dp))
-        if (busy) {
-            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-        } else {
-            val label = when {
-                app.installedTag == null -> "Install"
-                app.hasUpdate -> "Update"
-                else -> "Reinstall"
+            Spacer(Modifier.height(10.dp))
+            if (busy) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+            } else {
+                val label = when {
+                    app.installedTag == null -> "Install"
+                    app.hasUpdate -> "Update"
+                    else -> "Reinstall"
+                }
+                Button(onClick = onAction, modifier = Modifier.fillMaxWidth()) { Text(label) }
             }
-            Button(onClick = onAction) { Text(label) }
         }
     }
 }

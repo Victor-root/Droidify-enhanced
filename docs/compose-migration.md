@@ -113,15 +113,39 @@ d'apps ne marche qu'à partir de la phase 2) — c'est assumé. L'ancienne `Main
   `data/model/DeviceAbi.kt` (`selectForDevice`), réutilisée par l'install
   **et** l'écran (sinon « mise à jour dispo » en boucle sur x86).
 
-## Idées / features pour plus tard (après le moteur unique)
-> Demandées par le mainteneur ; à faire **après** avoir fini le moteur unique.
+## Features livrées (après le moteur unique)
+- [x] **Barre de synchro dans l'app** — bandeau (spinner + « Synchronisation en cours ») sous les
+  onglets, affiché pour **toute** synchro (1er lancement, bouton Sync, activation d'un dépôt,
+  périodique), sur l'écran principal et l'écran Dépôts. Source unique : `SyncWorker.isSyncing()`.
+- [x] **Sources externes façon Obtainium** (paquet `github/` + `compose/githubApps/`) — ajout d'un
+  projet par URL, choix d'APK selon l'ABI, download + install via le moteur existant, suivi des
+  MàJ. Onglet « GitHub » dans la liste principale ; ajout via Dépôts → `</>`.
 
-1. **Barre de synchro DANS l'app** (pas seulement la notif Android) : afficher une
-   barre de chargement **dans l'interface** dès qu'une synchro de dépôts tourne —
-   au **1er lancement** (sinon écran vide qui fait croire à un bug), quand on
-   **active un dépôt** depuis l'écran Dépôts, et globalement pendant **toute**
-   synchro. (En + de la notification Android.)
-2. **Sources « release GitHub » à la Obtainium** : pouvoir ajouter le lien
-   *release* d'un projet GitHub comme une source custom, et télécharger / mettre à
-   jour l'app directement depuis Droidify via ce lien (sans vrai dépôt F-Droid),
-   exactement comme l'app **Obtainium**.
+## Modernisation UI (chantier en cours — demandé par le mainteneur)
+> Objectif : **modernisation totale**, propre et sérieuse (pas de bricolage), par étapes. Réf. de
+> style citées : **Aurora Store** (affichage des apps) et **tabler.io** (icônes). Seul le panneau
+> Réglages est jugé déjà beau/moderne.
+
+1. **Apps externes = cycle de vie complet** : sur l'onglet GitHub, vraie barre de progression +
+   boutons Install / Désinstaller / Lancer / MàJ, exactement comme les apps F-Droid des autres
+   onglets (réutiliser la logique de `AppDetail`).
+2. **Recherche repliable** : retirer la barre de recherche permanente ; bouton **loupe** dans le
+   header qui déplie un champ au tap (masqué par défaut).
+3. **Refonte de la liste d'apps** — **décidé : grille de cartes 2 colonnes** (style vitrine :
+   icône large + nom + bouton/état). **Supprimer** les chips de catégories défilantes + le chip
+   « Favourites » (catégories → derrière un bouton filtre). Ne plus ressembler au Droid-ify d'origine.
+4. **Retirer la surbrillance d'accent** : plus de fond/surbrillance teinté de la couleur d'accent
+   (rouge/couleur user) ; utiliser neutre **noir/blanc selon light/dark**.
+5. [x] **Retirer le toggle « Material You »** des Réglages (doublon avec l'option *Fond d'écran* de
+   la palette de couleurs, qui active déjà Material You). **Fait.**
+6. **Traductions FR** : tout ce qui a été ajouté récemment est en dur en anglais → passer par des
+   `string` resources + `values-fr` (« GitHub apps », Install/Update, hints, snackbars, etc.).
+7. **Refonte des icônes** (surtout les **4 du header**, jugées vieillottes) : remplacer par des
+   vecteurs **tabler.io** (SVG → vector drawable), partout dans l'app.
+8. **Sources externes universelles** — **décidé : GitHub + GitLab + Codeberg** (détection auto
+   depuis l'URL), à la Obtainium. Renommer l'onglet « Externe » / « Sources », abstraire `github/`.
+
+**Contraintes mainteneur (à respecter dans toute la refonte) :**
+- **Garder les 4 onglets** (Explorer / Installé / Mises à jour / Externe) + le **header** avec les
+  fonctions principales — ce système plaît et est rapide d'accès. On change le *contenu*, pas la
+  structure onglets+header.
