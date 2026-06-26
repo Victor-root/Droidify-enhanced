@@ -33,6 +33,9 @@ import com.looker.droidify.network.NetworkResponse
 import com.looker.droidify.network.percentBy
 import com.looker.droidify.utility.common.cache.Cache
 import com.looker.droidify.utility.common.extension.asStateFlow
+import com.looker.droidify.utility.common.extension.calculateHash
+import com.looker.droidify.utility.common.extension.getPackageArchiveInfoCompat
+import com.looker.droidify.utility.common.extension.singleSignature
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
@@ -40,6 +43,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
@@ -226,6 +230,22 @@ class AppDetailViewModel @Inject constructor(
                     partialFile.delete()
                     return@withContext DownloadResult.Failed("APK verification failed (hash mismatch)")
                 }
+                // Signature gate: the index declares which signing key each release is signed with.
+                // Refuse an APK whose actual signer isn't one the index expects — the old Droidify did
+                // this and the Compose rewrite had dropped it. Only block on a *proven* mismatch (the
+                // index declares a signer, the APK has a single readable signer, and it differs), and
+                // honour the "ignore signatures" setting as an escape hatch.
+                val expectedSigners = pkg.manifest.signer
+                if (expectedSigners.isNotEmpty() && !settingsRepository.get { ignoreSignature }.first()) {
+                    val apkSigner = apkSignerHash(partialFile)
+                    if (apkSigner != null && expectedSigners.none { it.equals(apkSigner, ignoreCase = true) }) {
+                        Log.w(TAG, "Signer mismatch for $packageName: apk=$apkSigner expected=$expectedSigners")
+                        partialFile.delete()
+                        return@withContext DownloadResult.Failed(
+                            context.getString(R.string.invalid_signature_error_DESC),
+                        )
+                    }
+                }
                 partialFile.copyTo(Cache.getReleaseFile(context, cacheFileName), overwrite = true)
                 partialFile.delete()
                 DownloadResult.Ready
@@ -258,6 +278,17 @@ class AppDetailViewModel @Inject constructor(
             _downloadStatus.value = null
         }
     }
+
+    /**
+     * The downloaded APK's signing-certificate fingerprint (lowercase SHA-256 hex — the same format
+     * the index stores in [Package.manifest] signer), or null if it can't be read (e.g. the APK has
+     * multiple signers, which we don't try to match against the index).
+     */
+    private fun apkSignerHash(apkFile: File): String? =
+        context.packageManager
+            .getPackageArchiveInfoCompat(apkFile.absolutePath)
+            ?.singleSignature
+            ?.calculateHash()
 
     /**
      * True when [packageName] is already installed but signed by a different key than [apkFile].

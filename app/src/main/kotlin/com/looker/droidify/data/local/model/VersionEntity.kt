@@ -92,6 +92,7 @@ fun PackageV2.versionEntities(appId: Int): Map<VersionEntity, List<AntiFeatureAp
 fun List<VersionEntity>.toPackages(
     locale: String,
     installed: InstalledEntity?,
+    antiFeatures: List<AntiFeatureAppRelation> = emptyList(),
 ) = map { version ->
     Package(
         id = version.id.toLong(),
@@ -104,7 +105,12 @@ fun List<VersionEntity>.toPackages(
         ),
         platforms = Platforms(version.nativeCode),
         features = version.features,
-        antiFeatures = emptyList(), // This would need to be populated from AntiFeatureAppRelation
+        // Anti-features are stored per (appId, versionCode) in anti_features_app_relation; pick this
+        // version's. The rewrite had dropped this (emptyList()), so the detail screen showed no
+        // Tracking/Ads/NonFree/KnownVuln warnings the old Droidify did.
+        antiFeatures = antiFeatures
+            .filter { it.versionCode == version.versionCode }
+            .map { it.tag },
         manifest = Manifest(
             versionCode = version.versionCode,
             versionName = version.versionName,
@@ -114,16 +120,21 @@ fun List<VersionEntity>.toPackages(
                 target = version.targetSdkVersion,
             ),
             signer = version.signer.toSet(),
-            permissions = version.permissions.map {
-                Permission(
-                    name = it.name,
-                    sdKs = SDKs(
-                        min = -1, // PermissionV2 doesn't have minSdkVersion
-                        max = it.maxSdkVersion ?: -1,
-                        target = -1,
-                    ),
-                )
-            },
+            // Include the uses-permission-sdk-23 declarations too (requested at runtime on API 23+).
+            // The rewrite only mapped `permissions`, so those extra permissions were never shown.
+            // Dedupe by name in case a permission is declared in both lists.
+            permissions = (version.permissions + version.permissionsSdk23)
+                .distinctBy { it.name }
+                .map {
+                    Permission(
+                        name = it.name,
+                        sdKs = SDKs(
+                            min = -1, // PermissionV2 doesn't have minSdkVersion
+                            max = it.maxSdkVersion ?: -1,
+                            target = -1,
+                        ),
+                    )
+                },
         ),
         whatsNew = version.whatsNew.localizedValue(locale) ?: "",
     )

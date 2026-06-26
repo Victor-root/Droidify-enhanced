@@ -398,6 +398,12 @@ private fun AppDetail(
             LinksSection(app = app)
         }
 
+        val antiFeatures = suggestedPackage?.antiFeatures.orEmpty()
+        if (antiFeatures.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            AntiFeaturesSection(antiFeatures = antiFeatures)
+        }
+
         val permissions = suggestedPackage?.manifest?.permissions.orEmpty()
         if (permissions.isNotEmpty()) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -597,6 +603,54 @@ private fun LinkRow(
             overflow = TextOverflow.Ellipsis,
         )
     }
+}
+
+@Composable
+private fun AntiFeaturesSection(antiFeatures: List<String>) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SectionTitle(stringResource(R.string.anti_features))
+        antiFeatures.forEach { tag ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.ErrorOutline,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(
+                    text = antiFeatureLabel(tag),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/** Localised description for an F-Droid anti-feature tag; unknown tags fall back to the raw tag. */
+@Composable
+private fun antiFeatureLabel(tag: String): String = when (tag) {
+    "Ads" -> stringResource(R.string.has_advertising)
+    "ApplicationDebuggable" -> stringResource(R.string.compiled_for_debugging)
+    "DisabledAlgorithm" -> stringResource(R.string.signed_using_unsafe_algorithm)
+    "KnownVuln" -> stringResource(R.string.has_security_vulnerabilities)
+    "NoSourceSince" -> stringResource(R.string.source_code_no_longer_available)
+    "NonFreeAdd" -> stringResource(R.string.promotes_non_free_software)
+    "NonFreeAssets" -> stringResource(R.string.contains_non_free_media)
+    "NonFreeDep" -> stringResource(R.string.has_non_free_dependencies)
+    "NonFreeNet" -> stringResource(R.string.promotes_non_free_network_services)
+    "NSFW" -> stringResource(R.string.contains_nsfw)
+    "Tracking" -> stringResource(R.string.tracks_or_reports_your_activity)
+    "UpstreamNonFree" -> stringResource(R.string.upstream_source_code_is_not_free)
+    "NonFreeComp" -> stringResource(R.string.has_non_free_components)
+    "TetheredNet" -> stringResource(R.string.has_tethered_network)
+    else -> tag
 }
 
 @Composable
