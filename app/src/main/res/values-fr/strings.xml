@@ -78,6 +78,8 @@
     <string name="versions">Versions</string>
     <string name="waiting_to_start_download">En attente du lancement du téléchargement…</string>
     <string name="whats_new">Quoi de neuf</string>
+    <string name="discover_recently_updated">Récemment mis à jour</string>
+    <string name="categories">Catégories</string>
     <string name="website">Site internet du projet</string>
     <string name="update">Mettre à jour</string>
     <string name="updates">Mises à jour</string>

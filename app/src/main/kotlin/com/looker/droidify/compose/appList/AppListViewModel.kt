@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
@@ -187,12 +188,49 @@ class AppListViewModel @Inject constructor(
     /** True while any sync runs (first launch, manual, repo-enable, periodic) — drives the bar. */
     val isSyncing: StateFlow<Boolean> = SyncWorker.isSyncing(context).asStateFlow(false)
 
-    /** A small "What's new" showcase (most recently added apps) for the top of the home. */
+    /** "What's new" carousel on the Discover home — the most recently added apps. */
     val newApps: StateFlow<List<AppMinimal>> = catalogChanges
-        .mapLatest { appRepository.apps(sortOrder = SortOrder.ADDED).take(NEW_APPS_COUNT) }
+        .mapLatest { appRepository.apps(sortOrder = SortOrder.ADDED).take(DISCOVER_ROW_COUNT) }
         .distinctUntilChanged()
         .flowOn(Dispatchers.Default)
         .asStateFlow(emptyList())
+
+    /** "Recently updated" carousel on the Discover home. */
+    val recentlyUpdatedApps: StateFlow<List<AppMinimal>> = catalogChanges
+        .mapLatest { appRepository.apps(sortOrder = SortOrder.UPDATED).take(DISCOVER_ROW_COUNT) }
+        .distinctUntilChanged()
+        .flowOn(Dispatchers.Default)
+        .asStateFlow(emptyList())
+
+    /** How many per-category carousels the Discover home should show — set from the visible height so
+     *  the carousels fill roughly one screen, then the categories list follows. 0 disables them. */
+    private val _carouselCount = MutableStateFlow(0)
+
+    fun setCarouselCount(count: Int) {
+        _carouselCount.value = count
+    }
+
+    /** Per-category carousels for the Discover home: one row of apps per category, for as many
+     *  categories as [setCarouselCount] asks (empty when 0, so no extra queries run). */
+    val categoryCarousels: StateFlow<List<CategoryCarousel>> =
+        combine(catalogChanges, _carouselCount) { catalog, count -> catalog to count }
+            .distinctUntilChanged()
+            .mapLatest { (_, count) ->
+                if (count <= 0) {
+                    emptyList()
+                } else {
+                    appRepository.categories.first().take(count).mapNotNull { category ->
+                        val apps = appRepository.apps(
+                            sortOrder = SortOrder.UPDATED,
+                            categoriesToInclude = listOf(category),
+                        ).take(DISCOVER_ROW_COUNT)
+                        if (apps.isEmpty()) null else CategoryCarousel(category, apps)
+                    }
+                }
+            }
+            .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
+            .asStateFlow(emptyList())
 
     /** Persists the chosen sort order; [appsState] re-queries automatically. */
     fun setSortOrder(order: SortOrder) {
@@ -208,10 +246,16 @@ class AppListViewModel @Inject constructor(
     }
 }
 
-private const val NEW_APPS_COUNT = 12
+private const val DISCOVER_ROW_COUNT = 16
 
 /** How often catalogue changes are allowed to refresh the lists (throttles the first-sync flood). */
 private const val CATALOG_REFRESH_MS = 500L
+
+/** One Discover carousel: a category and a row of its apps. */
+data class CategoryCarousel(
+    val category: DefaultName,
+    val apps: List<AppMinimal>,
+)
 
 private data class AppQuery(
     val search: String,
