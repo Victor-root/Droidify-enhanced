@@ -102,117 +102,26 @@ fun DiscoverCarousel(
             horizontalArrangement = spacedBy(16.dp),
         ) {
             items(apps, key = { it.appId }) { app ->
-                DiscoverAppItem(
+                CatalogAppTile(
                     app = app,
                     isInstalled = app.packageName.name in installedPackages,
                     onClick = { onAppClick(app.packageName.name) },
+                    modifier = Modifier.width(80.dp),
                 )
             }
         }
     }
 }
 
+/** One category row in the accordion: icon + localized name + a chevron (down when collapsed, up when
+ *  expanded). The [defaultName] (English key) drives the icon; tapping toggles its inline app list. */
 @Composable
-private fun DiscoverAppItem(
-    app: AppMinimal,
-    isInstalled: Boolean,
+fun CategoryRow(
+    name: String,
+    defaultName: String,
+    expanded: Boolean = false,
     onClick: () -> Unit,
 ) {
-    Column(
-        verticalArrangement = spacedBy(8.dp),
-        modifier = Modifier
-            .width(80.dp)
-            .clickable(onClick = onClick),
-    ) {
-        Box {
-            var icon by remember(app.appId) { mutableStateOf(app.icon?.path) }
-            if (icon != null) {
-                AsyncImage(
-                    model = icon,
-                    onError = { icon = app.fallbackIcon?.path },
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(76.dp)
-                        .clip(MaterialTheme.shapes.large),
-                )
-            } else {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(76.dp)
-                        .clip(MaterialTheme.shapes.large)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                ) {
-                    Image(
-                        painter = painterResource(android.R.mipmap.sym_def_app_icon),
-                        contentDescription = null,
-                        modifier = Modifier.padding(10.dp),
-                    )
-                }
-            }
-            if (isInstalled) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .size(22.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Check,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(14.dp),
-                    )
-                }
-            }
-        }
-        Text(
-            text = app.name,
-            style = MaterialTheme.typography.bodySmall,
-            minLines = 2,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            lineHeight = 14.sp,
-        )
-    }
-}
-
-/**
- * The categories block on the Discover home (F-Droid style): a title and an outlined card listing the
- * categories — each a row with an icon, its name and a chevron. Tapping a row filters the catalogue.
- */
-@Composable
-fun DiscoverCategories(
-    categories: List<DefaultName>,
-    onCategoryClick: (DefaultName) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(verticalArrangement = spacedBy(10.dp), modifier = modifier) {
-        Text(
-            text = stringResource(R.string.categories),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            fontSize = 20.sp,
-            modifier = Modifier.padding(horizontal = 16.dp),
-        )
-        OutlinedCard(modifier = Modifier.padding(horizontal = 16.dp)) {
-            categories.forEachIndexed { index, category ->
-                CategoryRow(category = category, onClick = { onCategoryClick(category) })
-                if (index < categories.lastIndex) {
-                    HorizontalDivider()
-                }
-            }
-        }
-    }
-}
-
-/** One category row in the accordion: icon + name + a chevron (down when collapsed, up when
- *  expanded). Tapping toggles its inline app list. */
-@Composable
-fun CategoryRow(category: String, expanded: Boolean = false, onClick: () -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -230,7 +139,7 @@ fun CategoryRow(category: String, expanded: Boolean = false, onClick: () -> Unit
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
         ) {
             Icon(
-                imageVector = categoryIcon(category),
+                imageVector = categoryIcon(defaultName),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp),
@@ -238,7 +147,7 @@ fun CategoryRow(category: String, expanded: Boolean = false, onClick: () -> Unit
         }
         Spacer(Modifier.width(16.dp))
         Text(
-            text = category,
+            text = name,
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.weight(1f),
         )
@@ -247,39 +156,6 @@ fun CategoryRow(category: String, expanded: Boolean = false, onClick: () -> Unit
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-/**
- * Shown above the grid while one or more categories are active — removable chips so the user can
- * clear the filter and return to the full Discover home.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun DiscoverSelectedCategories(
-    selected: Set<DefaultName>,
-    onToggle: (DefaultName) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = spacedBy(8.dp),
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        items(selected.toList(), key = { it }) { category ->
-            FilterChip(
-                selected = true,
-                onClick = { onToggle(category) },
-                label = { Text(category) },
-                trailingIcon = {
-                    Icon(
-                        imageVector = Icons.Filled.Check,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                },
-            )
-        }
     }
 }
 

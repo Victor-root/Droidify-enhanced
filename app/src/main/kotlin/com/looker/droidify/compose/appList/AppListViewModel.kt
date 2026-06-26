@@ -10,6 +10,7 @@ import com.looker.droidify.data.AppRepository
 import com.looker.droidify.data.InstalledRepository
 import com.looker.droidify.data.SuggestedVersion
 import com.looker.droidify.data.model.AppMinimal
+import com.looker.droidify.data.model.CatalogCategory
 import com.looker.droidify.datastore.SettingsRepository
 import com.looker.droidify.datastore.get
 import com.looker.droidify.datastore.model.SortOrder
@@ -49,7 +50,8 @@ class AppListViewModel @Inject constructor(
     val searchQuery = TextFieldState("")
     private val searchQueryStream = snapshotFlow { searchQuery.text.toString() }.debounce(300)
 
-    val categories = appRepository.categories.asStateFlow(emptyList())
+    val categories: StateFlow<List<CatalogCategory>> =
+        appRepository.categories.asStateFlow(emptyList())
 
     private val _selectedCategories = MutableStateFlow<Set<DefaultName>>(emptySet())
     val selectedCategories: StateFlow<Set<DefaultName>> = _selectedCategories

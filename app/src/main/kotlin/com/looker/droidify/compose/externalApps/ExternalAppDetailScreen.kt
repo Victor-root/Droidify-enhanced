@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.looker.droidify.R
 import com.looker.droidify.compose.components.BackButton
+import com.looker.droidify.compose.theme.AccentBarHeight
 import com.looker.droidify.compose.theme.accentTopAppBarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,11 +67,16 @@ fun ExternalAppDetailScreen(
 
     Scaffold(
         topBar = {
-            // No title here: the app name sits next to the logo in the header below, so showing it
-            // in the bar too would just duplicate it.
             TopAppBar(
                 colors = accentTopAppBarColors(),
-                title = { },
+                expandedHeight = AccentBarHeight,
+                title = {
+                    Text(
+                        text = app?.label.orEmpty(),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 navigationIcon = { BackButton(onBackClick) },
             )
         },

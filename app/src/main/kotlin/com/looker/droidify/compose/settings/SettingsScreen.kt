@@ -60,6 +60,7 @@ import com.looker.droidify.utility.common.SdkCheck
 import com.looker.droidify.utility.common.extension.openLink
 import com.looker.droidify.utility.common.isIgnoreBatteryEnabled
 import com.looker.droidify.utility.common.requestBatteryFreedom
+import com.looker.droidify.compose.theme.AccentBarHeight
 import com.looker.droidify.compose.theme.accentTopAppBarColors
 import java.util.*
 import kotlin.time.Duration
@@ -150,6 +151,7 @@ fun SettingsScreen(
         topBar = {
             TopAppBar(
                 colors = accentTopAppBarColors(),
+                expandedHeight = AccentBarHeight,
                 title = { Text(text = stringResource(R.string.settings)) },
                 navigationIcon = { BackButton(onBackClick) },
             )

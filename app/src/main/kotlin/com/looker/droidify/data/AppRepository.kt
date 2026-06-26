@@ -6,6 +6,7 @@ import com.looker.droidify.data.local.dao.RepoDao
 import com.looker.droidify.data.local.model.toApp
 import com.looker.droidify.data.model.App
 import com.looker.droidify.data.model.AppMinimal
+import com.looker.droidify.data.model.CatalogCategory
 import com.looker.droidify.data.model.PackageName
 import com.looker.droidify.datastore.SettingsRepository
 import com.looker.droidify.datastore.get
@@ -15,9 +16,12 @@ import com.looker.droidify.sync.v2.model.Tag
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import java.util.Locale
 import javax.inject.Inject
 
 class AppRepository @Inject constructor(
@@ -90,8 +94,22 @@ class AppRepository @Inject constructor(
     val downloadStatsChanges: Flow<Int>
         get() = appDao.downloadStatsCountStream()
 
-    val categories: Flow<List<DefaultName>>
-        get() = repoDao.categories().map { it.map { category -> category.defaultName } }
+    /** Categories with their localized display names (see [RepoDao.categoriesLocalized]). The user's
+     *  language is resolved once on collection; changing it recreates the activity anyway. */
+    val categories: Flow<List<CatalogCategory>>
+        get() = flow {
+            emitAll(repoDao.categoriesLocalized(languagePrefix(localeStream.first())))
+        }
+
+    /** A SQL LIKE pattern (e.g. "fr%") for the user's language, so any region variant matches. */
+    private fun languagePrefix(language: String): String {
+        val lang = if (language == "system") {
+            Locale.getDefault().language
+        } else {
+            language.substringBefore('-').substringBefore('_')
+        }
+        return "$lang%"
+    }
 
     fun getApp(packageName: PackageName): Flow<List<App>> = combine(
         appDao.queryAppEntity(packageName.name),

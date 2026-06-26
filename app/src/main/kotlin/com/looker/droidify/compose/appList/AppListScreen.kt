@@ -102,13 +102,13 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.looker.droidify.R
-import com.looker.droidify.compose.components.CatalogCard
-import com.looker.droidify.compose.externalApps.ExternalGridCard
+import com.looker.droidify.compose.externalApps.ExternalAppTile
 import com.looker.droidify.compose.externalApps.ExternalAppsViewModel
 import com.looker.droidify.data.model.AppMinimal
 import com.looker.droidify.datastore.extension.sortOrderName
 import com.looker.droidify.datastore.model.SortOrder
 import com.looker.droidify.datastore.model.supportedSortOrders
+import com.looker.droidify.compose.theme.AccentBarHeight
 import com.looker.droidify.compose.theme.LocalAccentBarColor
 import com.looker.droidify.compose.theme.LocalEdgeToEdge
 import com.looker.droidify.compose.theme.LocalOnAccentBarColor
@@ -116,10 +116,6 @@ import com.looker.droidify.compose.theme.LocalStatusBarScrimAlpha
 import com.looker.droidify.compose.theme.accentTopAppBarColors
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.roundToInt
-
-// The top bar is intentionally shorter than Material's 64dp default: the title sits closer to the
-// status bar and the tabs sit closer to the title, so the (already tall) header wastes less space.
-private val AppBarHeight = 48.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -320,19 +316,24 @@ fun AppListScreen(
             return@Scaffold
         }
         LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
+            // A tile grid (icon + name), the same density as the Discover carousels, shared by every
+            // tab so the apps look identical everywhere.
+            columns = GridCells.Adaptive(minSize = 100.dp),
             state = gridState,
             contentPadding = contentPadding,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
+            // Installed package names, used to badge every tile that's already installed.
+            val installedPackages = installedVersionNames.keys
             if (selectedTab == AppTab.EXTERNAL) {
                 if (enabledExternalApps.isEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }, key = "external-empty") {
                         ExternalTabEmpty()
                     }
                 }
-                // Same 2-column grid as the catalogue tabs; install happens on the detail screen.
+                // Install happens on the detail screen; the grid mirrors the catalogue tabs exactly.
                 items(items = enabledExternalApps, key = { it.key }) { app ->
-                    ExternalGridCard(
+                    ExternalAppTile(
                         app = app,
                         isInstalled = app.key in externalInstalledKeys,
                         onClick = { onExternalAppClick(app.key) },
@@ -345,7 +346,6 @@ fun AppListScreen(
             // page; a category chevron expands its apps inline. When searching or on a section page,
             // this is skipped and the apps render as a flat list below.
             if (selectedTab == AppTab.AVAILABLE && !isSearching && !sectionView) {
-                val installedPackages = installedVersionNames.keys
                 // Breathing room below the header: the first carousel's round "see all" button
                 // otherwise sits glued to the tabs.
                 item(span = { GridItemSpan(maxLineSpan) }, key = "discover-top-gap") {
@@ -396,14 +396,24 @@ fun AppListScreen(
                         CategoriesTitle()
                     }
                     categories.forEach { category ->
-                        item(span = { GridItemSpan(maxLineSpan) }, key = "category-$category") {
+                        item(
+                            span = { GridItemSpan(maxLineSpan) },
+                            key = "category-${category.defaultName}",
+                        ) {
                             CategoryRow(
-                                category = category,
-                                expanded = category in expandedSections,
-                                onClick = { viewModel.toggleSection(category) },
+                                name = category.name,
+                                defaultName = category.defaultName,
+                                expanded = category.defaultName in expandedSections,
+                                onClick = { viewModel.toggleSection(category.defaultName) },
                             )
                         }
-                        expandedAppItems(category, expandedSections, expandedSectionApps, onAppClick)
+                        expandedAppItems(
+                            category.defaultName,
+                            expandedSections,
+                            expandedSectionApps,
+                            installedPackages,
+                            onAppClick,
+                        )
                     }
                 }
             }
@@ -418,8 +428,8 @@ fun AppListScreen(
                 }
             }
             // The Explore tab ends at the categories accordion — no flat grid under the Discover home.
-            // A flat list of full-width F-Droid-style rows appears when searching (search results) or
-            // on a carousel "see all" page (the whole section). The Installed/Updates tabs keep cards.
+            // A flat list of app tiles appears when searching (search results) or on a carousel "see
+            // all" page (the whole section). The Installed/Updates tabs use the same tiles.
             if (selectedTab == AppTab.AVAILABLE) {
                 val flatList = when {
                     sectionView -> openedSectionApps
@@ -429,11 +439,10 @@ fun AppListScreen(
                 items(
                     items = flatList,
                     key = { it.appId },
-                    span = { GridItemSpan(maxLineSpan) },
                 ) { app ->
-                    AppListRow(
+                    CatalogAppTile(
                         app = app,
-                        versionLabel = appVersionLabel(app, selectedTab, installedVersionNames),
+                        isInstalled = app.packageName.name in installedPackages,
                         onClick = { onAppClick(app.packageName.name) },
                     )
                 }
@@ -442,9 +451,9 @@ fun AppListScreen(
                     items = apps,
                     key = { it.appId },
                 ) { app ->
-                    AppCard(
+                    CatalogAppTile(
                         app = app,
-                        versionLabel = appVersionLabel(app, selectedTab, installedVersionNames),
+                        isInstalled = app.packageName.name in installedPackages,
                         onClick = { onAppClick(app.packageName.name) },
                     )
                 }
@@ -455,10 +464,9 @@ fun AppListScreen(
                     items = externalUpdates,
                     key = { "ext-${it.key}" },
                 ) { app ->
-                    ExternalGridCard(
+                    ExternalAppTile(
                         app = app,
                         isInstalled = app.key in externalInstalledKeys,
-                        version = "${app.installedTag} → ${app.latestTag}",
                         onClick = { onExternalAppClick(app.key) },
                     )
                 }
@@ -676,7 +684,7 @@ private fun SearchTopBar(
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
     TopAppBar(
         colors = accentTopAppBarColors(),
-        expandedHeight = AppBarHeight,
+        expandedHeight = AccentBarHeight,
         navigationIcon = {
             IconButton(onClick = onClose) {
                 Icon(
@@ -734,7 +742,7 @@ private fun AppListTopBar(
     val context = LocalContext.current
     TopAppBar(
         colors = accentTopAppBarColors(),
-        expandedHeight = AppBarHeight,
+        expandedHeight = AccentBarHeight,
         title = title,
         actions = {
             IconButton(
@@ -812,148 +820,6 @@ private fun AppListTopBar(
     )
 }
 
-/**
- * The version string to show on a card for the given [tab]: the real installed version on the
- * Installed tab, "installed → available" on the Updates tab, and the available (catalogue) version
- * elsewhere. The installed version comes from the package manager, so a fork installed over an
- * upstream package shows its actual version (e.g. "6.5.5-c") rather than the catalogue's.
- */
-private fun appVersionLabel(
-    app: AppMinimal,
-    tab: AppTab,
-    installedVersionNames: Map<String, String>,
-): String {
-    val installed = installedVersionNames[app.packageName.name]
-    return when (tab) {
-        AppTab.INSTALLED -> installed ?: app.suggestedVersion
-        AppTab.UPDATES ->
-            if (installed != null && installed != app.suggestedVersion) {
-                "$installed → ${app.suggestedVersion}"
-            } else {
-                app.suggestedVersion
-            }
-        else -> app.suggestedVersion
-    }
-}
-
-/** A catalogue app as a grid card (shared [CatalogCard] chrome): large icon, name, summary and
- *  version. Tapping opens the detail screen (install happens there). */
-@Composable
-private fun AppCard(
-    app: AppMinimal,
-    versionLabel: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    CatalogCard(
-        name = app.name,
-        summary = app.summary,
-        version = versionLabel,
-        onClick = onClick,
-        modifier = modifier,
-    ) {
-        var icon by remember(app.appId) { mutableStateOf(app.icon?.path) }
-        if (icon != null) {
-            AsyncImage(
-                model = icon,
-                onError = { icon = app.fallbackIcon?.path },
-                contentDescription = null,
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(MaterialTheme.shapes.medium),
-            )
-        } else {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(64.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        shape = MaterialTheme.shapes.medium,
-                    ),
-            ) {
-                Image(
-                    painter = painterResource(android.R.mipmap.sym_def_app_icon),
-                    contentDescription = null,
-                    modifier = Modifier.padding(8.dp),
-                )
-            }
-        }
-    }
-}
-
-/** A catalogue app as a full-width list row (F-Droid-style category / search results): icon, name,
- *  summary and version. Tapping opens the detail screen. */
-@Composable
-private fun AppListRow(
-    app: AppMinimal,
-    versionLabel: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        var icon by remember(app.appId) { mutableStateOf(app.icon?.path) }
-        if (icon != null) {
-            AsyncImage(
-                model = icon,
-                onError = { icon = app.fallbackIcon?.path },
-                contentDescription = null,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(MaterialTheme.shapes.medium),
-            )
-        } else {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        shape = MaterialTheme.shapes.medium,
-                    ),
-            ) {
-                Image(
-                    painter = painterResource(android.R.mipmap.sym_def_app_icon),
-                    contentDescription = null,
-                    modifier = Modifier.padding(6.dp),
-                )
-            }
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = app.name,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            val summary = app.summary
-            if (!summary.isNullOrBlank()) {
-                Text(
-                    text = summary,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        if (versionLabel.isNotBlank()) {
-            Text(
-                text = versionLabel,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
 @Composable
 private fun ExternalTabEmpty() {
     Box(
@@ -971,23 +837,23 @@ private fun ExternalTabEmpty() {
     }
 }
 
-/** Emits the inline-expanded app rows for a Discover section (a carousel or a category), lazily, when
- *  that section is expanded — full-width F-Droid-style rows below the carousel/category header. */
+/** Emits the inline-expanded app tiles for a Discover category, lazily, when it's expanded — the same
+ *  tiles as everywhere else, flowing into the grid below the category header. */
 private fun LazyGridScope.expandedAppItems(
     key: String,
     expandedSections: Set<String>,
     expandedSectionApps: Map<String, List<AppMinimal>>,
+    installedPackages: Set<String>,
     onAppClick: (String) -> Unit,
 ) {
     if (key !in expandedSections) return
     items(
         items = expandedSectionApps[key].orEmpty(),
         key = { "exp-$key-${it.appId}" },
-        span = { GridItemSpan(maxLineSpan) },
     ) { app ->
-        AppListRow(
+        CatalogAppTile(
             app = app,
-            versionLabel = app.suggestedVersion,
+            isInstalled = app.packageName.name in installedPackages,
             onClick = { onAppClick(app.packageName.name) },
         )
     }
@@ -1018,7 +884,7 @@ private fun sectionTitle(key: String?): String = when (key) {
 private fun SectionTopBar(title: String, onBack: () -> Unit) {
     TopAppBar(
         colors = accentTopAppBarColors(),
-        expandedHeight = AppBarHeight,
+        expandedHeight = AccentBarHeight,
         navigationIcon = {
             IconButton(onClick = onBack) {
                 Icon(

@@ -8,6 +8,7 @@ import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 
 /**
  * The accent colour used for the top bar and the system bars, and the contrasting colour for their
@@ -36,6 +37,12 @@ val LocalStatusBarScrimAlpha = staticCompositionLocalOf<MutableFloatState> { mut
  * behind under edge-to-edge — takes the accent colour, with a contrasting title and icons. Every
  * screen's TopAppBar uses this so the header and status bar follow the theme colour.
  */
+/**
+ * Height of every screen's top bar — shorter than Material's 64dp default so the title sits closer to
+ * the status bar and the screen wastes less space. Used app-wide so all headers stay consistent.
+ */
+val AccentBarHeight = 48.dp
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun accentTopAppBarColors(): TopAppBarColors = TopAppBarDefaults.topAppBarColors(

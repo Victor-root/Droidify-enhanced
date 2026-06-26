@@ -61,6 +61,7 @@ import com.looker.droidify.compose.repoDetail.components.LastUpdatedCard
 import com.looker.droidify.compose.repoList.GrayScaleColorFilter
 import com.looker.droidify.data.model.Repo
 import com.looker.droidify.utility.text.toAnnotatedString
+import com.looker.droidify.compose.theme.AccentBarHeight
 import com.looker.droidify.compose.theme.accentTopAppBarColors
 import java.util.*
 
@@ -90,6 +91,7 @@ fun RepoDetailScreen(
         topBar = {
             TopAppBar(
                 colors = accentTopAppBarColors(),
+                expandedHeight = AccentBarHeight,
                 title = { Text(stringResource(R.string.repository)) },
                 navigationIcon = { BackButton(onBackClick) },
                 actions = {
