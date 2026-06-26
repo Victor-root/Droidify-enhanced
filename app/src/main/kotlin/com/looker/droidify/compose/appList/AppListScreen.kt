@@ -111,6 +111,7 @@ fun AppListScreen(
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
     val newApps by viewModel.newApps.collectAsStateWithLifecycle()
     val recentlyUpdatedApps by viewModel.recentlyUpdatedApps.collectAsStateWithLifecycle()
+    val mostDownloadedApps by viewModel.mostDownloadedApps.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val categoryCarousels by viewModel.categoryCarousels.collectAsStateWithLifecycle()
     val expandedSections by viewModel.expandedSections.collectAsStateWithLifecycle()
@@ -234,7 +235,7 @@ fun AppListScreen(
                 if (newApps.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }, key = "carousel-new") {
                         DiscoverCarousel(
-                            title = stringResource(R.string.whats_new),
+                            title = stringResource(R.string.discover_new_apps),
                             apps = newApps,
                             installedPackages = installedPackages,
                             onAppClick = onAppClick,
@@ -259,6 +260,27 @@ fun AppListScreen(
                     }
                     expandedAppItems(
                         SECTION_RECENTLY_UPDATED,
+                        expandedSections,
+                        expandedSectionApps,
+                        onAppClick,
+                    )
+                }
+                // "Most downloaded" — F-Droid v2's third curated carousel. Hidden until the download-
+                // stats worker has fetched data, so it simply appears once stats land.
+                if (mostDownloadedApps.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "carousel-downloaded") {
+                        DiscoverCarousel(
+                            title = stringResource(R.string.discover_most_downloaded),
+                            apps = mostDownloadedApps,
+                            installedPackages = installedPackages,
+                            onAppClick = onAppClick,
+                            onSeeAll = { viewModel.toggleSection(SECTION_MOST_DOWNLOADED) },
+                            expanded = SECTION_MOST_DOWNLOADED in expandedSections,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
+                    }
+                    expandedAppItems(
+                        SECTION_MOST_DOWNLOADED,
                         expandedSections,
                         expandedSectionApps,
                         onAppClick,
@@ -858,8 +880,9 @@ private const val DISCOVER_CAROUSEL_DP = 170
 /** Approximate height taken by the top app bar + tab row above the Discover content, in dp. */
 private const val DISCOVER_CHROME_DP = 112
 
-/** The always-present carousels (What's new + Recently updated) that already fill part of the screen. */
-private const val DISCOVER_STANDARD_CAROUSELS = 2
+/** The curated carousels (New apps + Recently updated + Most downloaded) that already fill part of
+ *  the screen before the per-category carousels. */
+private const val DISCOVER_STANDARD_CAROUSELS = 3
 
 /** Upper bound on per-category carousels, so a very tall screen can't request an absurd number. */
 private const val DISCOVER_MAX_CATEGORY_CAROUSELS = 8

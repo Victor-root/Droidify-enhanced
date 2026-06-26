@@ -76,6 +76,14 @@ class AppListViewModel @Inject constructor(
         appRepository.catalogChanges.drop(1).sample(CATALOG_REFRESH_MS),
     ).distinctUntilChanged().asStateFlow(0)
 
+    // Throttled trigger for the download-stats table — the stats worker inserts roughly one batch per
+    // month, so this mirrors catalogChanges to refresh the "Most downloaded" carousel when stats land
+    // without flooding the UI.
+    private val statsChanges: StateFlow<Int> = merge(
+        appRepository.downloadStatsChanges.take(1),
+        appRepository.downloadStatsChanges.drop(1).sample(CATALOG_REFRESH_MS),
+    ).distinctUntilChanged().asStateFlow(0)
+
     val appsState: StateFlow<List<AppMinimal>> = combine(
         searchQueryStream,
         selectedCategories,
@@ -240,6 +248,16 @@ class AppListViewModel @Inject constructor(
         .flowOn(Dispatchers.Default)
         .asStateFlow(emptyList())
 
+    /** "Most downloaded" carousel on the Discover home (F-Droid v2's third curated row). Re-queries
+     *  when either the catalogue or the download-stats table changes; empty until the stats worker has
+     *  fetched data, so the carousel stays hidden until then. */
+    val mostDownloadedApps: StateFlow<List<AppMinimal>> =
+        combine(catalogChanges, statsChanges) { catalog, stats -> catalog to stats }
+            .mapLatest { appRepository.mostDownloadedApps(DISCOVER_ROW_COUNT) }
+            .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
+            .asStateFlow(emptyList())
+
     // Discover home sections the user expanded inline (a category name, or the "What's new" /
     // "Recently updated" sentinels). Their app lists load on demand and collapse when toggled off.
     private val _expandedSections = MutableStateFlow<Set<String>>(emptySet())
@@ -260,6 +278,7 @@ class AppListViewModel @Inject constructor(
                     result[key] = when (key) {
                         SECTION_WHATS_NEW -> appRepository.apps(sortOrder = SortOrder.ADDED)
                         SECTION_RECENTLY_UPDATED -> appRepository.apps(sortOrder = SortOrder.UPDATED)
+                        SECTION_MOST_DOWNLOADED -> appRepository.mostDownloadedApps(SECTION_EXPAND_LIMIT)
                         // A category section — either an accordion row (key = category name) or a
                         // per-category carousel (key = "::cat:" + name); both map to the category.
                         else -> appRepository.apps(
@@ -324,6 +343,7 @@ private const val DISCOVER_ROW_COUNT = 16
  *  category name). */
 const val SECTION_WHATS_NEW = "::whats_new"
 const val SECTION_RECENTLY_UPDATED = "::recently_updated"
+const val SECTION_MOST_DOWNLOADED = "::most_downloaded"
 
 /** Prefix for a per-category carousel's expand key, so it expands independently of the same
  *  category's accordion row. */

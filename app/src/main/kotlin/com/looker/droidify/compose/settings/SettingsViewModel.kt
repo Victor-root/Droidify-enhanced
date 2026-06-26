@@ -35,7 +35,9 @@ import com.looker.droidify.installer.installers.requestPermissionListener
 import com.looker.droidify.utility.common.extension.asStateFlow
 import com.looker.droidify.utility.common.extension.updateAsMutable
 import com.looker.droidify.work.CleanUpWorker
+import com.looker.droidify.work.DownloadStatsWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -56,6 +58,7 @@ class SettingsViewModel @Inject constructor(
     private val repoRepository: RepoRepository,
     private val customButtonRepository: CustomButtonRepository,
     private val handler: StringHandler,
+    @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     val snackbarHostState = SnackbarHostState()
@@ -209,7 +212,12 @@ class SettingsViewModel @Inject constructor(
     fun setDownloadStatisticsEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsRepository.setDownloadStatisticsEnabled(enabled)
-            if (!enabled) {
+            if (enabled) {
+                // Fetch now so the "Most downloaded" carousel fills in, and keep it fresh afterwards.
+                DownloadStatsWorker.fetchDownloadStats(context)
+                DownloadStatsWorker.schedulePeriodic(context)
+            } else {
+                DownloadStatsWorker.cancelPeriodic(context)
                 privacyRepository.clearDownloadStats()
             }
         }

@@ -70,9 +70,25 @@ class AppRepository @Inject constructor(
      *  or after a schema migration reset the database. */
     suspend fun appCount(): Int = withContext(Dispatchers.Default) { appDao.count() }
 
+    /**
+     * Top apps by download count for the Discover home's "Most downloaded" carousel. Empty until the
+     * download-stats worker has fetched data (or if stats are disabled), and guarded so a query
+     * failure simply yields no carousel rather than crashing the home screen.
+     */
+    suspend fun mostDownloadedApps(limit: Int): List<AppMinimal> = withContext(Dispatchers.Default) {
+        val currentLocale = localeStream.first()
+        runCatching { appDao.mostDownloaded(locale = currentLocale, limit = limit) }
+            .getOrDefault(emptyList())
+    }
+
     /** Emits whenever the catalogue (apps/versions) changes, e.g. after a sync. */
     val catalogChanges: Flow<Int>
         get() = appDao.catalogSizeStream()
+
+    /** Emits whenever the download-stats table changes (the stats worker inserted a monthly file),
+     *  so the "Most downloaded" carousel refreshes as soon as stats arrive. */
+    val downloadStatsChanges: Flow<Int>
+        get() = appDao.downloadStatsCountStream()
 
     val categories: Flow<List<DefaultName>>
         get() = repoDao.categories().map { it.map { category -> category.defaultName } }

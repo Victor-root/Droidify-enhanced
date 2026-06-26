@@ -251,7 +251,9 @@
     <string name="waiting_to_start_download">Download queued…</string>
     <string name="waiting_to_start_installation">Installation queued…</string>
     <string name="whats_new">What\'s new</string>
+    <string name="discover_new_apps">New apps</string>
     <string name="discover_recently_updated">Recently updated</string>
+    <string name="discover_most_downloaded">Most downloaded</string>
     <string name="categories">Categories</string>
     <string name="website">Project website</string>
     <string name="prefs_language_title">Language</string>
