@@ -2,6 +2,7 @@ package com.looker.droidify.compose.appDetail
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Build
@@ -105,11 +106,11 @@ class AppDetailViewModel @Inject constructor(
      * installed on the device. Android can't update across signers, so the UI shows a dialog asking
      * the user to uninstall the existing app first, instead of firing a doomed system install.
      */
-    private val _signatureConflict = MutableStateFlow(false)
-    val signatureConflict: StateFlow<Boolean> = _signatureConflict
+    private val _signatureConflict = MutableStateFlow<SignatureConflict?>(null)
+    val signatureConflict: StateFlow<SignatureConflict?> = _signatureConflict
 
     fun dismissSignatureConflict() {
-        _signatureConflict.value = false
+        _signatureConflict.value = null
     }
 
     private var downloadJob: Job? = null
@@ -233,9 +234,12 @@ class AppDetailViewModel @Inject constructor(
                 DownloadResult.Ready -> {
                     val releaseFile = Cache.getReleaseFile(context, cacheFileName)
                     if (installedWithDifferentSignature(packageName, releaseFile)) {
-                        // The user must uninstall the existing (differently-signed) copy first; the
-                        // detail screen shows a dialog explaining this.
-                        _signatureConflict.value = true
+                        // Different signer: Android can't update across keys. The detail screen shows a
+                        // dialog — offering to uninstall the existing copy first, unless it's a system
+                        // app, which can't be removed (so there's nothing the user can do, and we must
+                        // not keep telling them to uninstall in a loop).
+                        _signatureConflict.value =
+                            SignatureConflict(isSystemApp = isSystemApp(packageName))
                     } else {
                         installManager.install(packageName installFrom cacheFileName)
                     }
@@ -289,6 +293,13 @@ class AppDetailViewModel @Inject constructor(
         return signatures?.mapNotNull { it?.toCharsString() }?.toSet().orEmpty()
     }
 
+    /** True when [packageName] is a system app (or an update to one). Those can't be uninstalled, so a
+     *  differently-signed catalogue version can never replace them — there's no point offering it. */
+    private fun isSystemApp(packageName: String): Boolean = runCatching {
+        val flags = context.packageManager.getApplicationInfo(packageName, 0).flags
+        (flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0
+    }.getOrDefault(false)
+
     private fun readInstalledInfo(): InstalledInfo? {
         val info = runCatching {
             context.packageManager.getPackageInfo(packageName, 0)
@@ -328,6 +339,12 @@ class AppDetailViewModel @Inject constructor(
 data class InstalledInfo(
     val version: String,
     val source: String,
+)
+
+/** A blocked update because the installed app is signed by a different key. [isSystemApp] means it
+ *  can't be uninstalled, so the update can never be applied — the dialog says so instead of looping. */
+data class SignatureConflict(
+    val isSystemApp: Boolean,
 )
 
 private const val TAG = "AppDetailViewModel"

@@ -49,6 +49,10 @@ data class VersionEntity(
     val src: FileV2?,
     val features: List<String>,
     val nativeCode: List<String>,
+    // SHA-256 fingerprint(s) of this version's signing certificate(s), lowercase hex — exactly the
+    // format the installed app's signature is stored in. Used to tell whether a catalogue update can
+    // actually replace the installed app (same signer) or not (different signer).
+    val signer: List<String>,
     val permissions: List<PermissionV2>,
     val permissionsSdk23: List<PermissionV2>,
     val appId: Int,
@@ -70,6 +74,7 @@ fun PackageV2.versionEntities(appId: Int): Map<VersionEntity, List<AntiFeatureAp
             src = version.src,
             features = version.manifest.features.map { it.name },
             nativeCode = version.manifest.nativecode,
+            signer = version.manifest.signer?.sha256 ?: emptyList(),
             permissions = version.manifest.usesPermission,
             permissionsSdk23 = version.manifest.usesPermissionSdk23,
             appId = appId,
@@ -108,7 +113,7 @@ fun List<VersionEntity>.toPackages(
                 max = version.maxSdkVersion ?: -1,
                 target = version.targetSdkVersion,
             ),
-            signer = emptySet(), // This would need to be populated from somewhere
+            signer = version.signer.toSet(),
             permissions = version.permissions.map {
                 Permission(
                     name = it.name,

@@ -310,6 +310,9 @@
     <string name="external_add_source">Ajouter une source externe</string>
     <string name="install_failed_signature_mismatch">%1$s est déjà installé depuis une autre source. Désinstallez-le d\'abord, puis installez cette version.</string>
     <string name="signature_conflict_title">Désinstallation nécessaire</string>
+    <string name="signature_conflict_system_title">Remplacement impossible</string>
+    <string name="signature_conflict_system_app">%1$s est une app système signée avec une clé différente : elle ne peut pas être désinstallée ni remplacée par cette version.</string>
+    <string name="uninstall_failed">Impossible de désinstaller %1$s</string>
     <string name="installer_unknown">Source inconnue</string>
     <string name="installed_version_source">Installé : %1$s · via %2$s</string>
 </resources>

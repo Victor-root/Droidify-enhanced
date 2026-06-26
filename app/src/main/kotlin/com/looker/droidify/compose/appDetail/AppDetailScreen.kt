@@ -105,26 +105,43 @@ fun AppDetailScreen(
     val uriHandler = LocalUriHandler.current
     val signatureConflict by viewModel.signatureConflict.collectAsStateWithLifecycle()
 
-    if (signatureConflict) {
+    signatureConflict?.let { conflict ->
         val conflictAppName = (state as? AppDetailState.Success)?.app?.metadata?.name
             ?: viewModel.packageName
+        val titleRes = if (conflict.isSystemApp) {
+            R.string.signature_conflict_system_title
+        } else {
+            R.string.signature_conflict_title
+        }
+        val messageRes = if (conflict.isSystemApp) {
+            R.string.signature_conflict_system_app
+        } else {
+            R.string.install_failed_signature_mismatch
+        }
         AlertDialog(
             onDismissRequest = viewModel::dismissSignatureConflict,
-            title = { Text(stringResource(R.string.signature_conflict_title)) },
-            text = {
-                Text(stringResource(R.string.install_failed_signature_mismatch, conflictAppName))
-            },
+            title = { Text(stringResource(titleRes)) },
+            text = { Text(stringResource(messageRes, conflictAppName)) },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.uninstall()
-                        viewModel.dismissSignatureConflict()
-                    },
-                ) { Text(stringResource(R.string.uninstall)) }
+                if (conflict.isSystemApp) {
+                    // A system app can't be uninstalled — nothing to do but acknowledge.
+                    TextButton(onClick = viewModel::dismissSignatureConflict) {
+                        Text(stringResource(android.R.string.ok))
+                    }
+                } else {
+                    TextButton(
+                        onClick = {
+                            viewModel.uninstall()
+                            viewModel.dismissSignatureConflict()
+                        },
+                    ) { Text(stringResource(R.string.uninstall)) }
+                }
             },
             dismissButton = {
-                TextButton(onClick = viewModel::dismissSignatureConflict) {
-                    Text(stringResource(R.string.cancel))
+                if (!conflict.isSystemApp) {
+                    TextButton(onClick = viewModel::dismissSignatureConflict) {
+                        Text(stringResource(R.string.cancel))
+                    }
                 }
             },
         )

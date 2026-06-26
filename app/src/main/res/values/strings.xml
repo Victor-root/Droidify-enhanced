@@ -323,6 +323,9 @@
     <string name="external_add_source">Add external source</string>
     <string name="install_failed_signature_mismatch">%1$s is already installed from a different source. Uninstall it first, then install this version.</string>
     <string name="signature_conflict_title">Uninstall required</string>
+    <string name="signature_conflict_system_title">Can\'t be replaced</string>
+    <string name="signature_conflict_system_app">%1$s is a system app signed with a different key, so it can\'t be uninstalled or replaced by this version.</string>
+    <string name="uninstall_failed">Couldn\'t uninstall %1$s</string>
     <string name="installer_unknown">Unknown source</string>
     <string name="installed_version_source">Installed: %1$s · from %2$s</string>
 </resources>
