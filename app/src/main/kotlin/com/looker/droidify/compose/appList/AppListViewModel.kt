@@ -240,8 +240,42 @@ class AppListViewModel @Inject constructor(
         .flowOn(Dispatchers.Default)
         .asStateFlow(emptyList())
 
+    // Discover home sections the user expanded inline (a category name, or the "What's new" /
+    // "Recently updated" sentinels). Their app lists load on demand and collapse when toggled off.
+    private val _expandedSections = MutableStateFlow<Set<String>>(emptySet())
+    val expandedSections: StateFlow<Set<String>> = _expandedSections
+
+    fun toggleSection(key: String) {
+        _expandedSections.value = _expandedSections.value.let {
+            if (key in it) it - key else it + key
+        }
+    }
+
+    /** Apps for each currently-expanded section (capped), re-loaded when the catalogue changes. */
+    val expandedSectionApps: StateFlow<Map<String, List<AppMinimal>>> =
+        combine(catalogChanges, _expandedSections) { catalog, sections -> catalog to sections }
+            .mapLatest { (_, sections) ->
+                val result = mutableMapOf<String, List<AppMinimal>>()
+                for (key in sections) {
+                    result[key] = when (key) {
+                        SECTION_WHATS_NEW -> appRepository.apps(sortOrder = SortOrder.ADDED)
+                        SECTION_RECENTLY_UPDATED -> appRepository.apps(sortOrder = SortOrder.UPDATED)
+                        // A category section — either an accordion row (key = category name) or a
+                        // per-category carousel (key = "::cat:" + name); both map to the category.
+                        else -> appRepository.apps(
+                            sortOrder = SortOrder.UPDATED,
+                            categoriesToInclude = listOf(key.removePrefix(SECTION_CAT_PREFIX)),
+                        )
+                    }.take(SECTION_EXPAND_LIMIT)
+                }
+                result.toMap()
+            }
+            .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
+            .asStateFlow(emptyMap())
+
     /** How many per-category carousels the Discover home should show — set from the visible height so
-     *  the carousels fill roughly one screen, then the categories list follows. 0 disables them. */
+     *  the carousels fill roughly one screen, then the categories accordion follows. 0 disables them. */
     private val _carouselCount = MutableStateFlow(0)
 
     fun setCarouselCount(count: Int) {
@@ -285,6 +319,19 @@ class AppListViewModel @Inject constructor(
 }
 
 private const val DISCOVER_ROW_COUNT = 16
+
+/** Section keys for the inline-expandable Discover sections (the "::" prefix can't collide with a
+ *  category name). */
+const val SECTION_WHATS_NEW = "::whats_new"
+const val SECTION_RECENTLY_UPDATED = "::recently_updated"
+
+/** Prefix for a per-category carousel's expand key, so it expands independently of the same
+ *  category's accordion row. */
+const val SECTION_CAT_PREFIX = "::cat:"
+
+/** Cap on apps shown when a Discover section is expanded inline (a quick "see more", not the whole
+ *  catalogue). */
+private const val SECTION_EXPAND_LIMIT = 40
 
 /** How often catalogue changes are allowed to refresh the lists (throttles the first-sync flood). */
 private const val CATALOG_REFRESH_MS = 500L

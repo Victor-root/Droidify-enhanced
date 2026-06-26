@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -60,6 +61,7 @@ fun DiscoverCarousel(
     onAppClick: (String) -> Unit,
     onSeeAll: () -> Unit,
     modifier: Modifier = Modifier,
+    expanded: Boolean = false,
 ) {
     Column(verticalArrangement = spacedBy(10.dp), modifier = modifier) {
         Row(
@@ -83,8 +85,13 @@ fun DiscoverCarousel(
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             ) {
+                // Collapsed: a "see all" forward arrow. Expanded: an up chevron to collapse again.
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    imageVector = if (expanded) {
+                        Icons.Filled.ExpandLess
+                    } else {
+                        Icons.AutoMirrored.Filled.ArrowForward
+                    },
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurface,
                 )
@@ -202,8 +209,10 @@ fun DiscoverCategories(
     }
 }
 
+/** One category row in the Discover accordion: icon + name + a chevron that points down when
+ *  collapsed and up when expanded. Tapping toggles its inline app list. */
 @Composable
-private fun CategoryRow(category: String, onClick: () -> Unit) {
+fun CategoryRow(category: String, expanded: Boolean = false, onClick: () -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -232,7 +241,7 @@ private fun CategoryRow(category: String, onClick: () -> Unit) {
             modifier = Modifier.weight(1f),
         )
         Icon(
-            imageVector = Icons.Filled.ExpandMore,
+            imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )

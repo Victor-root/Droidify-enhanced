@@ -192,6 +192,16 @@ class AppDetailViewModel @Inject constructor(
             // the server would return an error instead of the APK.
             val url = repo.address.removeSuffix("/") + "/" + pkg.apk.name.removePrefix("/")
             val result = withContext(Dispatchers.IO) {
+                // Reuse an already-downloaded, hash-verified APK instead of fetching it again — e.g.
+                // after the user uninstalled a differently-signed copy and tapped install a second
+                // time. The cache file is keyed by the APK hash, so a different version can't be
+                // mistaken for this one.
+                val cachedRelease = Cache.getReleaseFile(context, cacheFileName)
+                if (cachedRelease.exists() &&
+                    cachedRelease.sha256Hex().equals(pkg.apk.hash, ignoreCase = true)
+                ) {
+                    return@withContext DownloadResult.Ready
+                }
                 val partialFile = Cache.getPartialReleaseFile(context, cacheFileName)
                 // Sliding-window speed estimate + throttled UI updates (the callback fires
                 // very frequently; we only push a new state a few times per second).
