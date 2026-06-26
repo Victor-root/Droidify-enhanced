@@ -107,6 +107,12 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun setEdgeToEdge(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setEdgeToEdge(enabled)
+        }
+    }
+
     fun setHomeScreenSwiping(enabled: Boolean) {
         viewModelScope.launch {
             settingsRepository.setHomeScreenSwiping(enabled)

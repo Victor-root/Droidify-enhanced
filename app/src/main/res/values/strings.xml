@@ -243,6 +243,8 @@
     <string name="ignore_signature_summary">Ignore signature verification when installing an app</string>
     <string name="update">Update</string>
     <string name="updates">Updates</string>
+    <!-- Short label used only on the tab so it never wraps to a second line -->
+    <string name="tab_updates_short">Updates</string>
     <string name="upstream_source_code_is_not_free">Upstream source code is non-free</string>
     <string name="username">Username</string>
     <string name="username_missing">Username missing</string>
@@ -313,6 +315,8 @@
     <string name="theme_color_DESC">Choose the accent color of the app</string>
     <string name="theme_color_default">Default</string>
     <string name="theme_color_wallpaper">Wallpaper</string>
+    <string name="edge_to_edge">Edge-to-edge</string>
+    <string name="edge_to_edge_summary">Draw the app behind the status and navigation bars. When off, the bars stay solid with the accent color.</string>
     <!-- External app sources (GitHub / GitLab / Codeberg) -->
     <string name="tab_external">External</string>
     <string name="external_add">Add</string>

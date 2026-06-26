@@ -101,6 +101,8 @@
     <string name="website">Site internet du projet</string>
     <string name="update">Mettre à jour</string>
     <string name="updates">Mises à jour</string>
+    <!-- Libellé court réservé à l\'onglet pour qu\'il ne passe jamais sur 2 lignes -->
+    <string name="tab_updates_short">MàJ</string>
     <string name="unknown_FORMAT">Inconnu : %s</string>
     <string name="unknown_error_DESC">Erreur inconnue</string>
     <string name="add_repository">Ajouter un dépôt</string>
@@ -307,6 +309,8 @@
     <string name="theme_color_DESC">Choisir la couleur d\'accentuation de l\'app</string>
     <string name="theme_color_default">Par défaut</string>
     <string name="theme_color_wallpaper">Fond d\'écran</string>
+    <string name="edge_to_edge">Bord à bord</string>
+    <string name="edge_to_edge_summary">Afficher l\'app derrière la barre d\'état et la barre de navigation. Désactivé, les barres restent pleines avec la couleur d\'accentuation.</string>
     <!-- Sources d\'apps externes (GitHub / GitLab / Codeberg) -->
     <string name="tab_external">Externe</string>
     <string name="external_add">Ajouter</string>

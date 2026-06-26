@@ -1,5 +1,7 @@
 package com.looker.droidify.compose.appList
 
+import android.app.Activity
+import android.content.ContextWrapper
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDp
@@ -23,7 +25,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
@@ -64,6 +68,8 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -80,12 +86,18 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
@@ -97,7 +109,19 @@ import com.looker.droidify.data.model.AppMinimal
 import com.looker.droidify.datastore.extension.sortOrderName
 import com.looker.droidify.datastore.model.SortOrder
 import com.looker.droidify.datastore.model.supportedSortOrders
+import com.looker.droidify.compose.theme.LocalAccentBarColor
+import com.looker.droidify.compose.theme.LocalEdgeToEdge
+import com.looker.droidify.compose.theme.LocalOnAccentBarColor
+import com.looker.droidify.compose.theme.LocalStatusBarScrimAlpha
+import com.looker.droidify.compose.theme.accentTopAppBarColors
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlin.math.roundToInt
 
+// The top bar is intentionally shorter than Material's 64dp default: the title sits closer to the
+// status bar and the tabs sit closer to the title, so the (already tall) header wastes less space.
+private val AppBarHeight = 48.dp
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppListScreen(
     viewModel: AppListViewModel,
@@ -121,6 +145,12 @@ fun AppListScreen(
     val updatesCount by viewModel.updatesCount.collectAsStateWithLifecycle()
     val installedVersionNames by viewModel.installedVersionNames.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
+    val edgeToEdge = LocalEdgeToEdge.current
+    // In edge-to-edge mode the whole header (toolbar + tabs + banner) collapses off the top on
+    // scroll-down and returns on the slightest scroll-up (Material 3 "enter always"); when off it
+    // stays pinned. Created unconditionally so the call site is stable across recompositions, and only
+    // wired up (nested scroll + collapsing layout) below when edge-to-edge is on.
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     // The Explore tab shows the Discover home (3 curated carousels + the categories list) by default;
     // once the user is searching or has opened a category, it shows a flat list of apps instead.
@@ -138,7 +168,54 @@ fun AppListScreen(
         viewModel.closeSection()
     }
     // Entering or leaving a section page swaps the whole list, so start it at the top.
-    LaunchedEffect(openedSection) { gridState.scrollToItem(0) }
+    LaunchedEffect(openedSection) {
+        gridState.scrollToItem(0)
+        scrollBehavior.state.heightOffset = 0f
+    }
+    // Switching tab or opening search must reveal the collapsed header again — otherwise a short
+    // tab (e.g. a near-empty Installed list) could leave it stuck hidden with no room to scroll up.
+    LaunchedEffect(selectedTab, searchExpanded) {
+        scrollBehavior.state.heightOffset = 0f
+    }
+
+    // Status-bar icons: white while the red header sits behind the status bar, but once the header has
+    // collapsed enough that the app content shows behind the status bar, match that content instead —
+    // otherwise white icons would land on a white background in light mode (dark mode is fine, white on
+    // black). Driven off the scroll state through a snapshotFlow so the screen doesn't recompose each
+    // frame; the white icons are handed back to the red header when we leave or turn edge-to-edge off.
+    val view = LocalView.current
+    val statusBarPx = WindowInsets.statusBars.getTop(LocalDensity.current)
+    val backgroundIsLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val statusBarScrimAlpha = LocalStatusBarScrimAlpha.current
+    if (edgeToEdge && !view.isInEditMode) {
+        LaunchedEffect(view, statusBarPx, backgroundIsLight, statusBarScrimAlpha) {
+            val window = generateSequence(view.context) { (it as? ContextWrapper)?.baseContext }
+                .filterIsInstance<Activity>()
+                .firstOrNull()
+                ?.window ?: return@LaunchedEffect
+            val controller = WindowCompat.getInsetsController(window, view)
+            try {
+                snapshotFlow {
+                    val headerHeightPx = -scrollBehavior.state.heightOffsetLimit
+                    val headerBottomPx = scrollBehavior.state.heightOffset + headerHeightPx
+                    // How much of the status bar now shows app content instead of the red header (0..1).
+                    if (headerHeightPx <= 0f || statusBarPx <= 0) {
+                        0f
+                    } else {
+                        ((statusBarPx - headerBottomPx) / statusBarPx).coerceIn(0f, 1f)
+                    }
+                }.distinctUntilChanged().collect { contentFraction ->
+                    // Fade the faint scrim in with the content, and once content dominates the bar flip
+                    // the icons to match it (only matters in light mode; dark content suits white icons).
+                    statusBarScrimAlpha.floatValue = contentFraction
+                    controller.isAppearanceLightStatusBars = contentFraction > 0.5f && backgroundIsLight
+                }
+            } finally {
+                statusBarScrimAlpha.floatValue = 0f
+                controller.isAppearanceLightStatusBars = false
+            }
+        }
+    }
 
     // Cold/warm start: the Discover carousels are fed by independent flows that emit in a race, and
     // LazyGrid anchors on its first visible item — so a carousel that finishes loading *above* the
@@ -190,9 +267,17 @@ fun AppListScreen(
     val catalogLoading = isSyncing && newApps.isEmpty() && selectedTab != AppTab.EXTERNAL
 
     Scaffold(
+        // Edge-to-edge: let the header collapse as the grid scrolls. Pinned otherwise.
+        modifier = if (edgeToEdge) {
+            Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+        } else {
+            Modifier
+        },
         snackbarHost = { SnackbarHost(externalViewModel.snackbarHostState) },
         topBar = {
-            Column {
+            Column(
+                modifier = if (edgeToEdge) Modifier.collapsingHeader(scrollBehavior) else Modifier,
+            ) {
                 // A carousel "see all" page takes over the whole header: a back arrow + the section
                 // title, with no tabs, so it reads as its own screen.
                 if (sectionView) {
@@ -261,6 +346,11 @@ fun AppListScreen(
             // this is skipped and the apps render as a flat list below.
             if (selectedTab == AppTab.AVAILABLE && !isSearching && !sectionView) {
                 val installedPackages = installedVersionNames.keys
+                // Breathing room below the header: the first carousel's round "see all" button
+                // otherwise sits glued to the tabs.
+                item(span = { GridItemSpan(maxLineSpan) }, key = "discover-top-gap") {
+                    Spacer(Modifier.height(12.dp))
+                }
                 if (newApps.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }, key = "carousel-new") {
                         DiscoverCarousel(
@@ -377,6 +467,25 @@ fun AppListScreen(
     }
 }
 
+/**
+ * Collapses the element this modifies (the whole header) off the top of the screen as the body
+ * scrolls, driven by [scrollBehavior]'s enter-always logic. It reports a height that shrinks with the
+ * scroll offset — so the Scaffold slides the body up into the freed space — and translates the header
+ * by the same amount, so the header leaves and the content slides behind the status bar together.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+private fun Modifier.collapsingHeader(scrollBehavior: TopAppBarScrollBehavior): Modifier =
+    layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        // The header can collapse by its full height; tell the scroll behaviour so it clamps there.
+        scrollBehavior.state.heightOffsetLimit = -placeable.height.toFloat()
+        val offsetY = scrollBehavior.state.heightOffset.roundToInt() // 0 (shown) .. -height (hidden)
+        val measuredHeight = (placeable.height + offsetY).coerceAtLeast(0)
+        layout(placeable.width, measuredHeight) {
+            placeable.place(0, offsetY)
+        }
+    }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppTabRow(
@@ -384,7 +493,11 @@ private fun AppTabRow(
     updatesCount: Int,
     onSelectTab: (AppTab) -> Unit,
 ) {
-    TabRow(selectedTabIndex = selectedTab.ordinal) {
+    TabRow(
+        selectedTabIndex = selectedTab.ordinal,
+        containerColor = LocalAccentBarColor.current,
+        contentColor = LocalOnAccentBarColor.current,
+    ) {
         AppTab.entries.forEach { tab ->
             Tab(
                 selected = tab == selectedTab,
@@ -393,14 +506,17 @@ private fun AppTabRow(
                     val label = when (tab) {
                         AppTab.AVAILABLE -> stringResource(R.string.available)
                         AppTab.INSTALLED -> stringResource(R.string.installed)
+                        // Short label ("MàJ") so the count fits on one line — a wrapping label would
+                        // otherwise make the whole tab bar taller.
                         AppTab.UPDATES -> if (updatesCount > 0) {
-                            "${stringResource(R.string.updates)} ($updatesCount)"
+                            "${stringResource(R.string.tab_updates_short)} ($updatesCount)"
                         } else {
-                            stringResource(R.string.updates)
+                            stringResource(R.string.tab_updates_short)
                         }
                         AppTab.EXTERNAL -> stringResource(R.string.tab_external)
                     }
-                    Text(label)
+                    // Never wrap: one line keeps every tab — and the bar — the same height.
+                    Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 },
             )
         }
@@ -559,6 +675,8 @@ private fun SearchTopBar(
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
     TopAppBar(
+        colors = accentTopAppBarColors(),
+        expandedHeight = AppBarHeight,
         navigationIcon = {
             IconButton(onClick = onClose) {
                 Icon(
@@ -571,8 +689,9 @@ private fun SearchTopBar(
             BasicTextField(
                 state = state,
                 lineLimits = TextFieldLineLimits.SingleLine,
-                textStyle = LocalTextStyle.current.copy(color = MaterialTheme.colorScheme.onSurface),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                // On the accent-coloured bar the text/cursor must contrast with it, not use on-surface.
+                textStyle = LocalTextStyle.current.copy(color = LocalOnAccentBarColor.current),
+                cursorBrush = SolidColor(LocalOnAccentBarColor.current),
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focusRequester),
@@ -581,7 +700,7 @@ private fun SearchTopBar(
                         if (state.text.isEmpty()) {
                             Text(
                                 text = stringResource(R.string.search),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = LocalOnAccentBarColor.current.copy(alpha = 0.7f),
                             )
                         }
                         inner()
@@ -614,6 +733,8 @@ private fun AppListTopBar(
     var expanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
     TopAppBar(
+        colors = accentTopAppBarColors(),
+        expandedHeight = AppBarHeight,
         title = title,
         actions = {
             IconButton(
@@ -896,6 +1017,8 @@ private fun sectionTitle(key: String?): String = when (key) {
 @Composable
 private fun SectionTopBar(title: String, onBack: () -> Unit) {
     TopAppBar(
+        colors = accentTopAppBarColors(),
+        expandedHeight = AppBarHeight,
         navigationIcon = {
             IconButton(onClick = onBack) {
                 Icon(

@@ -83,6 +83,7 @@ import com.looker.droidify.data.model.selectForDevice
 import com.looker.droidify.datastore.model.CustomButton
 import com.looker.droidify.installer.model.InstallState
 import com.looker.droidify.utility.text.toAnnotatedString
+import com.looker.droidify.compose.theme.accentTopAppBarColors
 
 /**
  * Maximum number of version rows rendered on the detail screen. The screen is a single
@@ -152,6 +153,7 @@ fun AppDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+                colors = accentTopAppBarColors(),
                 title = {
                     when (state) {
                         AppDetailState.Loading -> Text(stringResource(R.string.application))

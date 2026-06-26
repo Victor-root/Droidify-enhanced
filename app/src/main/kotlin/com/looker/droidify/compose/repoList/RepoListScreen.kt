@@ -51,6 +51,7 @@ import com.looker.droidify.compose.externalApps.ExternalAppsViewModel
 import com.looker.droidify.data.model.Repo
 import com.looker.droidify.external.ExternalApp
 import com.looker.droidify.utility.text.toAnnotatedString
+import com.looker.droidify.compose.theme.accentTopAppBarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,6 +82,7 @@ fun RepoListScreen(
         topBar = {
             Column {
                 TopAppBar(
+                    colors = accentTopAppBarColors(),
                     title = { Text(text = stringResource(R.string.repositories)) },
                     navigationIcon = { BackButton(onBackClick) },
                     actions = {

@@ -60,6 +60,7 @@ import com.looker.droidify.utility.common.SdkCheck
 import com.looker.droidify.utility.common.extension.openLink
 import com.looker.droidify.utility.common.isIgnoreBatteryEnabled
 import com.looker.droidify.utility.common.requestBatteryFreedom
+import com.looker.droidify.compose.theme.accentTopAppBarColors
 import java.util.*
 import kotlin.time.Duration
 
@@ -148,6 +149,7 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+                colors = accentTopAppBarColors(),
                 title = { Text(text = stringResource(R.string.settings)) },
                 navigationIcon = { BackButton(onBackClick) },
             )
@@ -201,6 +203,15 @@ fun SettingsScreen(
                     description = stringResource(R.string.home_screen_swiping_DESC),
                     checked = settings.homeScreenSwiping,
                     onCheckedChange = viewModel::setHomeScreenSwiping,
+                )
+            }
+
+            item {
+                SwitchSettingItem(
+                    title = stringResource(R.string.edge_to_edge),
+                    description = stringResource(R.string.edge_to_edge_summary),
+                    checked = settings.edgeToEdge,
+                    onCheckedChange = viewModel::setEdgeToEdge,
                 )
             }
 
