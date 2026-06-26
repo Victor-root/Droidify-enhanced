@@ -3,6 +3,7 @@ package com.looker.droidify.compose.appList
 import android.app.Activity
 import android.content.ContextWrapper
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateFloat
@@ -45,6 +46,8 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
@@ -132,6 +135,7 @@ fun AppListScreen(
     val recentlyUpdatedApps by viewModel.recentlyUpdatedApps.collectAsStateWithLifecycle()
     val mostDownloadedApps by viewModel.mostDownloadedApps.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
+    val favouritesOnly by viewModel.favouritesOnly.collectAsStateWithLifecycle()
     val expandedSections by viewModel.expandedSections.collectAsStateWithLifecycle()
     val expandedSectionApps by viewModel.expandedSectionApps.collectAsStateWithLifecycle()
     val openedSection by viewModel.openedSection.collectAsStateWithLifecycle()
@@ -163,6 +167,10 @@ fun AppListScreen(
     BackHandler(enabled = sectionView && !searchExpanded) {
         viewModel.closeSection()
     }
+    // System back leaves the favourites filter and returns to the full Discover home.
+    BackHandler(enabled = favouritesOnly && !searchExpanded && !sectionView) {
+        viewModel.toggleFavouritesOnly()
+    }
     // Entering or leaving a section page swaps the whole list, so start it at the top.
     LaunchedEffect(openedSection) {
         gridState.scrollToItem(0)
@@ -170,7 +178,7 @@ fun AppListScreen(
     }
     // Switching tab or opening search must reveal the collapsed header again — otherwise a short
     // tab (e.g. a near-empty Installed list) could leave it stuck hidden with no room to scroll up.
-    LaunchedEffect(selectedTab, searchExpanded) {
+    LaunchedEffect(selectedTab, searchExpanded, favouritesOnly) {
         scrollBehavior.state.heightOffset = 0f
     }
 
@@ -295,8 +303,21 @@ fun AppListScreen(
                         currentSort = sortOrder,
                         onSortSelected = viewModel::setSortOrder,
                         title = {
-                            Text("Droid-ify")
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_launcher_monochrome),
+                                    contentDescription = null,
+                                    tint = LocalOnAccentBarColor.current,
+                                    modifier = Modifier.size(28.dp),
+                                )
+                                Text("Droid-ify")
+                            }
                         },
+                        favouritesOnly = favouritesOnly,
+                        onToggleFavourites = viewModel::toggleFavouritesOnly,
                     )
                     AppTabRow(
                         selectedTab = selectedTab,
@@ -345,7 +366,7 @@ fun AppListScreen(
             // carousels then the categories accordion. A carousel arrow opens that section as its own
             // page; a category chevron expands its apps inline. When searching or on a section page,
             // this is skipped and the apps render as a flat list below.
-            if (selectedTab == AppTab.AVAILABLE && !isSearching && !sectionView) {
+            if (selectedTab == AppTab.AVAILABLE && !isSearching && !sectionView && !favouritesOnly) {
                 // Breathing room below the header: the first carousel's round "see all" button
                 // otherwise sits glued to the tabs.
                 item(span = { GridItemSpan(maxLineSpan) }, key = "discover-top-gap") {
@@ -431,7 +452,36 @@ fun AppListScreen(
             // A flat list of app tiles appears when searching (search results) or on a carousel "see
             // all" page (the whole section). The Installed/Updates tabs use the same tiles.
             if (selectedTab == AppTab.AVAILABLE) {
+                // The favourites filter (toggled from the overflow menu) takes over the Explore tab:
+                // a "Favourites" heading then the favourite apps as the same tiles, or a hint if empty.
+                if (favouritesOnly) {
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "favourites-title") {
+                        Text(
+                            text = stringResource(R.string.favourites),
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                    if (apps.isEmpty()) {
+                        item(span = { GridItemSpan(maxLineSpan) }, key = "favourites-empty") {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.no_favourites),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
+                        }
+                    }
+                }
                 val flatList = when {
+                    favouritesOnly -> apps
                     sectionView -> openedSectionApps
                     isSearching -> apps
                     else -> emptyList()
@@ -730,15 +780,46 @@ private fun AppListTopBar(
     onNavigateToSettings: () -> Unit,
     currentSort: SortOrder,
     onSortSelected: (SortOrder) -> Unit,
+    favouritesOnly: Boolean,
+    onToggleFavourites: () -> Unit,
     title: @Composable () -> Unit,
 ) {
-    // Tapping the magnifier unfolds the search field into the whole header (back arrow + input);
-    // closing it folds back to the title + actions.
-    if (searchExpanded) {
-        SearchTopBar(state = searchState, onClose = onToggleSearch)
-        return
+    // Tapping the magnifier unfolds the search field into the whole header. Fade between the two so it
+    // doesn't pop in abruptly.
+    AnimatedContent(targetState = searchExpanded, label = "search-bar") { isSearch ->
+        if (isSearch) {
+            SearchTopBar(state = searchState, onClose = onToggleSearch)
+        } else {
+            AppListMainTopBar(
+                onSync = onSync,
+                onToggleSearch = onToggleSearch,
+                onNavigateToRepos = onNavigateToRepos,
+                onNavigateToSettings = onNavigateToSettings,
+                currentSort = currentSort,
+                onSortSelected = onSortSelected,
+                favouritesOnly = favouritesOnly,
+                onToggleFavourites = onToggleFavourites,
+                title = title,
+            )
+        }
     }
-    var expanded by remember { mutableStateOf(false) }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun AppListMainTopBar(
+    onSync: () -> Unit,
+    onToggleSearch: () -> Unit,
+    onNavigateToRepos: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    currentSort: SortOrder,
+    onSortSelected: (SortOrder) -> Unit,
+    favouritesOnly: Boolean,
+    onToggleFavourites: () -> Unit,
+    title: @Composable () -> Unit,
+) {
+    var sortExpanded by remember { mutableStateOf(false) }
+    var overflowExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
     TopAppBar(
         colors = accentTopAppBarColors(),
@@ -767,24 +848,24 @@ private fun AppListTopBar(
             Spacer(Modifier.width(4.dp))
             Box {
                 IconButton(
-                    onClick = { expanded = true },
+                    onClick = { sortExpanded = true },
                     modifier = Modifier.size(smallContainerSize(Narrow)),
                 ) {
                     Icon(
-                        painterResource(R.drawable.ic_tabler_sort),
+                        Icons.AutoMirrored.Filled.Sort,
                         contentDescription = stringResource(R.string.sort),
                     )
                 }
                 DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false },
+                    expanded = sortExpanded,
+                    onDismissRequest = { sortExpanded = false },
                 ) {
                     supportedSortOrders().forEach { order ->
                         DropdownMenuItem(
                             text = { Text(context.sortOrderName(order)) },
                             onClick = {
                                 onSortSelected(order)
-                                expanded = false
+                                sortExpanded = false
                             },
                             trailingIcon = if (order == currentSort) {
                                 { Icon(Icons.Filled.Check, contentDescription = null) }
@@ -796,24 +877,61 @@ private fun AppListTopBar(
                 }
             }
             Spacer(Modifier.width(4.dp))
-            IconButton(
-                onClick = onNavigateToRepos,
-                modifier = Modifier.size(smallContainerSize(Narrow)),
-            ) {
-                Icon(
-                    painterResource(R.drawable.ic_tabler_box),
-                    contentDescription = stringResource(R.string.repositories),
-                )
-            }
-            Spacer(Modifier.width(4.dp))
-            IconButton(
-                onClick = onNavigateToSettings,
-                modifier = Modifier.size(smallContainerSize(Narrow)),
-            ) {
-                Icon(
-                    painterResource(R.drawable.ic_tabler_settings),
-                    contentDescription = stringResource(R.string.settings),
-                )
+            // Overflow: the less-used destinations (favourites filter, repositories, settings) live
+            // here so the header stays uncluttered.
+            Box {
+                IconButton(
+                    onClick = { overflowExpanded = true },
+                    modifier = Modifier.size(smallContainerSize(Narrow)),
+                ) {
+                    Icon(
+                        Icons.Filled.MoreVert,
+                        contentDescription = stringResource(R.string.more_options),
+                    )
+                }
+                DropdownMenu(
+                    expanded = overflowExpanded,
+                    onDismissRequest = { overflowExpanded = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.favourites)) },
+                        onClick = {
+                            onToggleFavourites()
+                            overflowExpanded = false
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Filled.Favorite, contentDescription = null)
+                        },
+                        trailingIcon = if (favouritesOnly) {
+                            { Icon(Icons.Filled.Check, contentDescription = null) }
+                        } else {
+                            null
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.repositories)) },
+                        onClick = {
+                            onNavigateToRepos()
+                            overflowExpanded = false
+                        },
+                        leadingIcon = {
+                            Icon(painterResource(R.drawable.ic_tabler_box), contentDescription = null)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.settings)) },
+                        onClick = {
+                            onNavigateToSettings()
+                            overflowExpanded = false
+                        },
+                        leadingIcon = {
+                            Icon(
+                                painterResource(R.drawable.ic_tabler_settings),
+                                contentDescription = null,
+                            )
+                        },
+                    )
+                }
             }
             Spacer(Modifier.width(4.dp))
         },

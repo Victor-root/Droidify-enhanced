@@ -67,6 +67,8 @@
     <string name="export_repos_DESC">Export repositories to a file</string>
     <string name="enable_repo">Enable repository</string>
     <string name="favourites">Favourites</string>
+    <string name="more_options">More</string>
+    <string name="no_favourites">No favourites yet. Tap the heart on an app to add it here.</string>
     <string name="file_format_error_DESC">Invalid file format</string>
     <string name="fingerprint">Fingerprint</string>
     <string name="force_clean_up">Force cleanup</string>

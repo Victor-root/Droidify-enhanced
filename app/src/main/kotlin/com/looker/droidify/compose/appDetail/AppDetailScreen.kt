@@ -305,7 +305,9 @@ private fun AppDetail(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .then(modifier),
+            .then(modifier)
+            // Breathing room so the header section isn't glued under the top bar.
+            .padding(top = 16.dp),
     ) {
         HeaderSection(
             app = app,
