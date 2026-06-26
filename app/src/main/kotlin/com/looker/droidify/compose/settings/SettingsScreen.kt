@@ -175,7 +175,12 @@ fun SettingsScreen(
                 }
             }
 
-            item { SettingHeader(title = stringResource(R.string.prefs_personalization)) }
+            item {
+                SettingHeader(
+                    title = stringResource(R.string.prefs_personalization),
+                    icon = painterResource(R.drawable.ic_themes),
+                )
+            }
 
             item {
                 LanguageSetting(
@@ -217,7 +222,12 @@ fun SettingsScreen(
                 )
             }
 
-            item { SettingHeader(title = stringResource(R.string.updates)) }
+            item {
+                SettingHeader(
+                    title = stringResource(R.string.updates),
+                    icon = painterResource(R.drawable.ic_new_releases),
+                )
+            }
 
             item {
                 SwitchSettingItem(
@@ -264,7 +274,12 @@ fun SettingsScreen(
                 )
             }
 
-            item { SettingHeader(title = stringResource(R.string.sync_repositories)) }
+            item {
+                SettingHeader(
+                    title = stringResource(R.string.sync_repositories),
+                    icon = painterResource(R.drawable.ic_sync),
+                )
+            }
 
             item {
                 AutoSyncSetting(
@@ -308,7 +323,12 @@ fun SettingsScreen(
                 )
             }
 
-            item { SettingHeader(title = stringResource(R.string.install_types)) }
+            item {
+                SettingHeader(
+                    title = stringResource(R.string.install_types),
+                    icon = painterResource(R.drawable.ic_apk_install),
+                )
+            }
 
             item {
                 InstallerTypeSetting(
@@ -337,7 +357,12 @@ fun SettingsScreen(
                 }
             }
 
-            item { SettingHeader(title = stringResource(R.string.proxy)) }
+            item {
+                SettingHeader(
+                    title = stringResource(R.string.proxy),
+                    icon = painterResource(R.drawable.ic_proxy),
+                )
+            }
 
             item {
                 ProxyTypeSetting(
@@ -364,7 +389,12 @@ fun SettingsScreen(
                 }
             }
 
-            item { SettingHeader(title = stringResource(R.string.import_export)) }
+            item {
+                SettingHeader(
+                    title = stringResource(R.string.import_export),
+                    icon = painterResource(R.drawable.ic_save),
+                )
+            }
 
             item {
                 ActionSettingItem(
@@ -398,7 +428,12 @@ fun SettingsScreen(
                 )
             }
 
-            item { SettingHeader(title = stringResource(R.string.custom_buttons_section)) }
+            item {
+                SettingHeader(
+                    title = stringResource(R.string.custom_buttons_section),
+                    icon = painterResource(R.drawable.ic_tabler_plus),
+                )
+            }
 
             item {
                 CustomButtonsSettingItem(
@@ -411,7 +446,12 @@ fun SettingsScreen(
                 )
             }
 
-            item { SettingHeader(title = stringResource(R.string.author)) }
+            item {
+                SettingHeader(
+                    title = stringResource(R.string.author),
+                    icon = painterResource(R.drawable.ic_person),
+                )
+            }
 
             item {
                 AuthorRow(
@@ -431,7 +471,12 @@ fun SettingsScreen(
                 )
             }
 
-            item { SettingHeader(title = stringResource(R.string.special_credits)) }
+            item {
+                SettingHeader(
+                    title = stringResource(R.string.special_credits),
+                    icon = painterResource(R.drawable.ic_copyright),
+                )
+            }
 
             item {
                 ActionSettingItem(

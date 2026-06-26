@@ -4,6 +4,8 @@
     <string name="action_failed">L’action a échoué</string>
     <string name="already_exists">Existe déjà</string>
     <string name="anti_features">Anti-fonctionnalités</string>
+    <string name="requires_google_services">Nécessite les services Google</string>
+    <string name="requires_google_services_summary">Cette application utilise les services Google Play et peut ne pas fonctionner pleinement sans eux (ou microG).</string>
     <string name="compiled_for_debugging">Compilé pour le débogage</string>
     <string name="amoled">Noir</string>
     <string name="application_not_found">Appli non trouvée</string>

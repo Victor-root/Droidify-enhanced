@@ -41,6 +41,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -342,6 +343,16 @@ private fun AppDetail(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
+        }
+
+        // Flag apps that embed Google Play services so it's obvious up-front they may misbehave on a
+        // de-Googled device (no GMS / microG). Detected from the manifest permissions, which is far
+        // more reliable than the broad "non-free dependency" anti-feature tag.
+        val suggestedPermissions =
+            (installablePackage ?: packages.firstOrNull()?.first)?.manifest?.permissions.orEmpty()
+        if (suggestedPermissions.requiresGoogleServices()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            GoogleServicesBadge(modifier = Modifier.padding(horizontal = 16.dp))
         }
 
         if (customButtons.isNotEmpty()) {
@@ -652,6 +663,56 @@ private fun LinkRow(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+/** Permission-name prefixes that mean the app embeds Google Play services and relies on them to run
+ *  fully: the GMS APIs, Firebase/GCM push delivery, and the Google Services Framework. Restricted to
+ *  these reliable markers so the badge doesn't fire on unrelated `com.google.android.*` permissions
+ *  (e.g. a launcher's search-box or a DPC's setup-wizard permission). */
+private val googleServicePermissionPrefixes = listOf(
+    "com.google.android.gms.permission.",
+    "com.google.android.c2dm.permission.RECEIVE",
+    "com.google.android.providers.gsf.permission.READ_GSERVICES",
+)
+
+private fun List<Permission>.requiresGoogleServices(): Boolean =
+    any { permission -> googleServicePermissionPrefixes.any(permission.name::startsWith) }
+
+/** Up-front notice that the app needs Google Play services, so it's clear before installing that it
+ *  may not work fully on a de-Googled device (no GMS / microG). */
+@Composable
+private fun GoogleServicesBadge(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_tabler_brand_google),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp),
+            )
+            Column {
+                Text(
+                    text = stringResource(R.string.requires_google_services),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = stringResource(R.string.requires_google_services_summary),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
