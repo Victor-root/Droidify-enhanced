@@ -71,6 +71,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -79,7 +80,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -97,7 +97,6 @@ import com.looker.droidify.data.model.AppMinimal
 import com.looker.droidify.datastore.extension.sortOrderName
 import com.looker.droidify.datastore.model.SortOrder
 import com.looker.droidify.datastore.model.supportedSortOrders
-import kotlin.math.roundToInt
 
 @Composable
 fun AppListScreen(
@@ -113,34 +112,55 @@ fun AppListScreen(
     val recentlyUpdatedApps by viewModel.recentlyUpdatedApps.collectAsStateWithLifecycle()
     val mostDownloadedApps by viewModel.mostDownloadedApps.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
-    val categoryCarousels by viewModel.categoryCarousels.collectAsStateWithLifecycle()
     val expandedSections by viewModel.expandedSections.collectAsStateWithLifecycle()
     val expandedSectionApps by viewModel.expandedSectionApps.collectAsStateWithLifecycle()
+    val openedSection by viewModel.openedSection.collectAsStateWithLifecycle()
+    val openedSectionApps by viewModel.openedSectionApps.collectAsStateWithLifecycle()
     val sortOrder by viewModel.sortOrderFlow.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val updatesCount by viewModel.updatesCount.collectAsStateWithLifecycle()
     val installedVersionNames by viewModel.installedVersionNames.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
-    // The Explore tab shows the Discover home (carousels + categories) by default; once the user is
-    // searching or has opened a category, it shows a flat list of results instead. Reading the field's
-    // text here subscribes to its changes.
+    // The Explore tab shows the Discover home (3 curated carousels + the categories list) by default;
+    // once the user is searching or has opened a category, it shows a flat list of apps instead.
     val isSearching = viewModel.searchQuery.text.isNotEmpty()
+    // A curated carousel's "see all" opens it as its own page (a flat list of the whole section);
+    // null means we're on the Discover home. Categories, by contrast, expand inline in the accordion.
+    val sectionView = openedSection != null
     // Collapse the in-header search on system back (folds it back into the magnifier).
     BackHandler(enabled = searchExpanded) {
         searchExpanded = false
         viewModel.searchQuery.clearText()
     }
-
-    // Show just enough per-category carousels to fill (roughly) one screen of the Discover home; the
-    // categories accordion then follows as soon as you scroll. Derived from the available height.
-    val screenHeightDp = LocalConfiguration.current.screenHeightDp
-    val carouselCount = remember(screenHeightDp) {
-        val available = (screenHeightDp - DISCOVER_CHROME_DP).coerceAtLeast(0)
-        val rows = (available.toFloat() / DISCOVER_CAROUSEL_DP).roundToInt()
-        (rows - DISCOVER_STANDARD_CAROUSELS).coerceIn(0, DISCOVER_MAX_CATEGORY_CAROUSELS)
+    // System back leaves a carousel "see all" page and returns to the Discover home.
+    BackHandler(enabled = sectionView && !searchExpanded) {
+        viewModel.closeSection()
     }
-    LaunchedEffect(carouselCount) { viewModel.setCarouselCount(carouselCount) }
+    // Entering or leaving a section page swaps the whole list, so start it at the top.
+    LaunchedEffect(openedSection) { gridState.scrollToItem(0) }
+
+    // Cold/warm start: the Discover carousels are fed by independent flows that emit in a race, and
+    // LazyGrid anchors on its first visible item — so a carousel that finishes loading *above* the
+    // current anchor (e.g. "New apps" arriving after "Most downloaded") shoves the top off-screen and
+    // the Explore tab opens already scrolled down. Pin it to the top while the sections stream in,
+    // and stop the moment the user actually scrolls (a real drag/fling sets isScrollInProgress; the
+    // programmatic scrollToItem below does not, so this never fights the user).
+    var userScrolled by remember { mutableStateOf(false) }
+    LaunchedEffect(gridState) {
+        snapshotFlow { gridState.isScrollInProgress }
+            .collect { scrolling -> if (scrolling) userScrolled = true }
+    }
+    LaunchedEffect(
+        newApps.size,
+        recentlyUpdatedApps.size,
+        mostDownloadedApps.size,
+        categories.size,
+    ) {
+        if (selectedTab == AppTab.AVAILABLE && !isSearching && !sectionView && !userScrolled) {
+            gridState.scrollToItem(0)
+        }
+    }
 
     // The External tab is backed by its own ViewModel (Obtainium-style sources: GitHub/GitLab/
     // Codeberg). It shows the same 2-column card grid as the F-Droid tabs; tapping a card opens the
@@ -173,30 +193,39 @@ fun AppListScreen(
         snackbarHost = { SnackbarHost(externalViewModel.snackbarHostState) },
         topBar = {
             Column {
-                AppListTopBar(
-                    onSync = viewModel::sync,
-                    searchExpanded = searchExpanded,
-                    onToggleSearch = {
-                        searchExpanded = !searchExpanded
-                        if (!searchExpanded) viewModel.searchQuery.clearText()
-                    },
-                    searchState = viewModel.searchQuery,
-                    onNavigateToRepos = onNavigateToRepos,
-                    onNavigateToSettings = onNavigateToSettings,
-                    currentSort = sortOrder,
-                    onSortSelected = viewModel::setSortOrder,
-                    title = {
-                        Text("Droid-ify")
-                    },
-                )
-                AppTabRow(
-                    selectedTab = selectedTab,
-                    updatesCount = updatesCount + externalUpdates.size,
-                    onSelectTab = viewModel::selectTab,
-                )
-                // While the full-screen fetching state is up, the thin banner is redundant.
-                if (isSyncing && !catalogLoading) {
-                    SyncBanner()
+                // A carousel "see all" page takes over the whole header: a back arrow + the section
+                // title, with no tabs, so it reads as its own screen.
+                if (sectionView) {
+                    SectionTopBar(
+                        title = sectionTitle(openedSection),
+                        onBack = { viewModel.closeSection() },
+                    )
+                } else {
+                    AppListTopBar(
+                        onSync = viewModel::sync,
+                        searchExpanded = searchExpanded,
+                        onToggleSearch = {
+                            searchExpanded = !searchExpanded
+                            if (!searchExpanded) viewModel.searchQuery.clearText()
+                        },
+                        searchState = viewModel.searchQuery,
+                        onNavigateToRepos = onNavigateToRepos,
+                        onNavigateToSettings = onNavigateToSettings,
+                        currentSort = sortOrder,
+                        onSortSelected = viewModel::setSortOrder,
+                        title = {
+                            Text("Droid-ify")
+                        },
+                    )
+                    AppTabRow(
+                        selectedTab = selectedTab,
+                        updatesCount = updatesCount + externalUpdates.size,
+                        onSelectTab = viewModel::selectTab,
+                    )
+                    // While the full-screen fetching state is up, the thin banner is redundant.
+                    if (isSyncing && !catalogLoading) {
+                        SyncBanner()
+                    }
                 }
             }
         },
@@ -222,15 +251,15 @@ fun AppListScreen(
                         app = app,
                         isInstalled = app.key in externalInstalledKeys,
                         onClick = { onExternalAppClick(app.key) },
-                        modifier = Modifier.animateItem(),
                     )
                 }
                 return@LazyVerticalGrid
             }
-            // Discover home (Explore tab, not searching): two curated carousels then the categories
-            // accordion. The carousel arrows and the category chevrons all expand a list inline — no
-            // separate page. When searching, this is skipped and the results render as a flat list.
-            if (selectedTab == AppTab.AVAILABLE && !isSearching) {
+            // Discover home (Explore tab, not searching, not on a "see all" page): the 3 curated
+            // carousels then the categories accordion. A carousel arrow opens that section as its own
+            // page; a category chevron expands its apps inline. When searching or on a section page,
+            // this is skipped and the apps render as a flat list below.
+            if (selectedTab == AppTab.AVAILABLE && !isSearching && !sectionView) {
                 val installedPackages = installedVersionNames.keys
                 if (newApps.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }, key = "carousel-new") {
@@ -239,12 +268,10 @@ fun AppListScreen(
                             apps = newApps,
                             installedPackages = installedPackages,
                             onAppClick = onAppClick,
-                            onSeeAll = { viewModel.toggleSection(SECTION_WHATS_NEW) },
-                            expanded = SECTION_WHATS_NEW in expandedSections,
+                            onSeeAll = { viewModel.openSection(SECTION_WHATS_NEW) },
                             modifier = Modifier.padding(bottom = 8.dp),
                         )
                     }
-                    expandedAppItems(SECTION_WHATS_NEW, expandedSections, expandedSectionApps, onAppClick)
                 }
                 if (recentlyUpdatedApps.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }, key = "carousel-updated") {
@@ -253,17 +280,10 @@ fun AppListScreen(
                             apps = recentlyUpdatedApps,
                             installedPackages = installedPackages,
                             onAppClick = onAppClick,
-                            onSeeAll = { viewModel.toggleSection(SECTION_RECENTLY_UPDATED) },
-                            expanded = SECTION_RECENTLY_UPDATED in expandedSections,
+                            onSeeAll = { viewModel.openSection(SECTION_RECENTLY_UPDATED) },
                             modifier = Modifier.padding(bottom = 8.dp),
                         )
                     }
-                    expandedAppItems(
-                        SECTION_RECENTLY_UPDATED,
-                        expandedSections,
-                        expandedSectionApps,
-                        onAppClick,
-                    )
                 }
                 // "Most downloaded" — F-Droid v2's third curated carousel. Hidden until the download-
                 // stats worker has fetched data, so it simply appears once stats land.
@@ -274,36 +294,13 @@ fun AppListScreen(
                             apps = mostDownloadedApps,
                             installedPackages = installedPackages,
                             onAppClick = onAppClick,
-                            onSeeAll = { viewModel.toggleSection(SECTION_MOST_DOWNLOADED) },
-                            expanded = SECTION_MOST_DOWNLOADED in expandedSections,
+                            onSeeAll = { viewModel.openSection(SECTION_MOST_DOWNLOADED) },
                             modifier = Modifier.padding(bottom = 8.dp),
                         )
                     }
-                    expandedAppItems(
-                        SECTION_MOST_DOWNLOADED,
-                        expandedSections,
-                        expandedSectionApps,
-                        onAppClick,
-                    )
                 }
-                // Per-category carousels that fill the rest of the screen. Each has its own expand key
-                // (prefixed) so its arrow expands inline below it, independently of the same category's
-                // accordion row further down.
-                categoryCarousels.forEach { row ->
-                    val carouselKey = SECTION_CAT_PREFIX + row.category
-                    item(span = { GridItemSpan(maxLineSpan) }, key = "cat-carousel-${row.category}") {
-                        DiscoverCarousel(
-                            title = row.category,
-                            apps = row.apps,
-                            installedPackages = installedPackages,
-                            onAppClick = onAppClick,
-                            onSeeAll = { viewModel.toggleSection(carouselKey) },
-                            expanded = carouselKey in expandedSections,
-                            modifier = Modifier.padding(bottom = 8.dp),
-                        )
-                    }
-                    expandedAppItems(carouselKey, expandedSections, expandedSectionApps, onAppClick)
-                }
+                // The categories accordion. The chevron expands a category's apps inline; tapping
+                // again collapses it.
                 if (categories.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }, key = "categories-title") {
                         CategoriesTitle()
@@ -330,23 +327,25 @@ fun AppListScreen(
                     EmptyTabMessage(tab = selectedTab)
                 }
             }
-            // The Explore tab ends at the categories accordion — no flat grid under the Discover
-            // home. A flat list of apps appears only when searching, as full-width F-Droid-style
-            // rows. The Installed/Updates tabs keep their 2-column cards.
+            // The Explore tab ends at the categories accordion — no flat grid under the Discover home.
+            // A flat list of full-width F-Droid-style rows appears when searching (search results) or
+            // on a carousel "see all" page (the whole section). The Installed/Updates tabs keep cards.
             if (selectedTab == AppTab.AVAILABLE) {
-                if (isSearching) {
-                    items(
-                        items = apps,
-                        key = { it.appId },
-                        span = { GridItemSpan(maxLineSpan) },
-                    ) { app ->
-                        AppListRow(
-                            app = app,
-                            versionLabel = appVersionLabel(app, selectedTab, installedVersionNames),
-                            onClick = { onAppClick(app.packageName.name) },
-                            modifier = Modifier.animateItem(),
-                        )
-                    }
+                val flatList = when {
+                    sectionView -> openedSectionApps
+                    isSearching -> apps
+                    else -> emptyList()
+                }
+                items(
+                    items = flatList,
+                    key = { it.appId },
+                    span = { GridItemSpan(maxLineSpan) },
+                ) { app ->
+                    AppListRow(
+                        app = app,
+                        versionLabel = appVersionLabel(app, selectedTab, installedVersionNames),
+                        onClick = { onAppClick(app.packageName.name) },
+                    )
                 }
             } else {
                 items(
@@ -357,7 +356,6 @@ fun AppListScreen(
                         app = app,
                         versionLabel = appVersionLabel(app, selectedTab, installedVersionNames),
                         onClick = { onAppClick(app.packageName.name) },
-                        modifier = Modifier.animateItem(),
                     )
                 }
             }
@@ -372,7 +370,6 @@ fun AppListScreen(
                         isInstalled = app.key in externalInstalledKeys,
                         version = "${app.installedTag} → ${app.latestTag}",
                         onClick = { onExternalAppClick(app.key) },
-                        modifier = Modifier.animateItem(),
                     )
                 }
             }
@@ -473,8 +470,8 @@ private fun SyncBanner() {
 @Composable
 private fun EmptyTabMessage(tab: AppTab) {
     val message = when (tab) {
-        AppTab.INSTALLED -> "No installed apps found"
-        AppTab.UPDATES -> "Everything is up to date"
+        AppTab.INSTALLED -> stringResource(R.string.no_installed_apps)
+        AppTab.UPDATES -> stringResource(R.string.everything_up_to_date)
         AppTab.AVAILABLE -> ""
         AppTab.EXTERNAL -> ""
     }
@@ -539,7 +536,7 @@ fun SearchBar(
                         },
                     )
                     Text(
-                        text = "Search",
+                        text = stringResource(R.string.search),
                         color = color,
                     )
                 }
@@ -633,7 +630,10 @@ private fun AppListTopBar(
                 onClick = onSync,
                 modifier = Modifier.size(smallContainerSize(Narrow)),
             ) {
-                Icon(painterResource(R.drawable.ic_tabler_refresh), contentDescription = "Sync")
+                Icon(
+                    painterResource(R.drawable.ic_tabler_refresh),
+                    contentDescription = stringResource(R.string.sync),
+                )
             }
             Spacer(Modifier.width(4.dp))
             Box {
@@ -641,7 +641,10 @@ private fun AppListTopBar(
                     onClick = { expanded = true },
                     modifier = Modifier.size(smallContainerSize(Narrow)),
                 ) {
-                    Icon(painterResource(R.drawable.ic_tabler_sort), contentDescription = "Sort")
+                    Icon(
+                        painterResource(R.drawable.ic_tabler_sort),
+                        contentDescription = stringResource(R.string.sort),
+                    )
                 }
                 DropdownMenu(
                     expanded = expanded,
@@ -668,14 +671,20 @@ private fun AppListTopBar(
                 onClick = onNavigateToRepos,
                 modifier = Modifier.size(smallContainerSize(Narrow)),
             ) {
-                Icon(painterResource(R.drawable.ic_tabler_box), contentDescription = "Repos")
+                Icon(
+                    painterResource(R.drawable.ic_tabler_box),
+                    contentDescription = stringResource(R.string.repositories),
+                )
             }
             Spacer(Modifier.width(4.dp))
             IconButton(
                 onClick = onNavigateToSettings,
                 modifier = Modifier.size(smallContainerSize(Narrow)),
             ) {
-                Icon(painterResource(R.drawable.ic_tabler_settings), contentDescription = "Settings")
+                Icon(
+                    painterResource(R.drawable.ic_tabler_settings),
+                    contentDescription = stringResource(R.string.settings),
+                )
             }
             Spacer(Modifier.width(4.dp))
         },
@@ -859,12 +868,11 @@ private fun LazyGridScope.expandedAppItems(
             app = app,
             versionLabel = app.suggestedVersion,
             onClick = { onAppClick(app.packageName.name) },
-            modifier = Modifier.animateItem(),
         )
     }
 }
 
-/** "Categories" heading above the Discover accordion. */
+/** "Categories" heading above the categories list. */
 @Composable
 private fun CategoriesTitle() {
     Text(
@@ -874,15 +882,29 @@ private fun CategoriesTitle() {
     )
 }
 
-/** Approximate height of one Discover carousel (title + a row of icons + spacing), in dp. */
-private const val DISCOVER_CAROUSEL_DP = 170
+/** The localized title for a curated-carousel "see all" page. */
+@Composable
+private fun sectionTitle(key: String?): String = when (key) {
+    SECTION_WHATS_NEW -> stringResource(R.string.discover_new_apps)
+    SECTION_RECENTLY_UPDATED -> stringResource(R.string.discover_recently_updated)
+    SECTION_MOST_DOWNLOADED -> stringResource(R.string.discover_most_downloaded)
+    else -> ""
+}
 
-/** Approximate height taken by the top app bar + tab row above the Discover content, in dp. */
-private const val DISCOVER_CHROME_DP = 112
+/** Header for a carousel "see all" page: a back arrow that returns to the Discover home + the title. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SectionTopBar(title: String, onBack: () -> Unit) {
+    TopAppBar(
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.cancel),
+                )
+            }
+        },
+        title = { Text(title) },
+    )
+}
 
-/** The curated carousels (New apps + Recently updated + Most downloaded) that already fill part of
- *  the screen before the per-category carousels. */
-private const val DISCOVER_STANDARD_CAROUSELS = 3
-
-/** Upper bound on per-category carousels, so a very tall screen can't request an absurd number. */
-private const val DISCOVER_MAX_CATEGORY_CAROUSELS = 8

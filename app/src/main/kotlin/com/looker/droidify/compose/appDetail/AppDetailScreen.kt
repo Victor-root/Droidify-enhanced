@@ -33,18 +33,20 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalIconToggleButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -193,6 +195,7 @@ fun AppDetailScreen(
                     installedInfo = installedInfo,
                     isFavourite = isFavourite,
                     onToggleFavourite = viewModel::toggleFavourite,
+                    onSelectRepo = viewModel::setPreferredRepo,
                     onInstallOrUpdate = viewModel::installOrUpdate,
                     onLaunch = viewModel::launch,
                     onUninstall = viewModel::uninstall,
@@ -264,6 +267,7 @@ private fun PrimaryActions(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppDetail(
     app: App,
@@ -274,6 +278,7 @@ private fun AppDetail(
     installedInfo: InstalledInfo?,
     isFavourite: Boolean,
     onToggleFavourite: () -> Unit,
+    onSelectRepo: (Int) -> Unit,
     onInstallOrUpdate: () -> Unit,
     onLaunch: () -> Unit,
     onUninstall: () -> Unit,
@@ -285,9 +290,11 @@ private fun AppDetail(
     // The newest release this device can actually install (device-aware; see [selectForDevice]).
     // Comparing against the raw suggested code would keep flagging an update on, say, an x86 device,
     // because VLC's suggested code belongs to its (un-installable) arm64 build.
-    val installablePackage = remember(packages, app.metadata.suggestedVersionCode) {
-        packages.selectForDevice(app.metadata.suggestedVersionCode)?.first
+    val installable = remember(packages, app.metadata.suggestedVersionCode) {
+        packages.selectForDevice(app.metadata.suggestedVersionCode)
     }
+    val installablePackage = installable?.first
+    val installableRepo = installable?.second
     val updateAvailable = installedPackage != null && installablePackage != null &&
         installedPackage.manifest.versionCode < installablePackage.manifest.versionCode
     Column(
@@ -411,11 +418,46 @@ private fun AppDetail(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        val suggestedVersion = installablePackage?.manifest?.versionCode
-        // This screen is a single (non-lazy) scroll column, so every version row composes eagerly.
-        // Apps with many versions were composing hundreds of rows at once, freezing the UI; cap the
-        // list to the newest releases (packages are already sorted newest-first).
-        packages.take(MAX_VERSIONS_SHOWN).forEach { (pkg, repo) ->
+
+        // Repos that offer this app. When more than one offers it (e.g. F-Droid + IzzyOnDroid), show
+        // tabs so the user can pick which repo to install from; both the version list below and the
+        // Install/Update button then follow the selected repo. Default to the repo that provides the
+        // device-suggested version.
+        val repos = remember(packages) { packages.map { it.second }.distinctBy { it.id } }
+        var selectedRepoId by remember(repos, installableRepo) {
+            mutableStateOf(installableRepo?.id ?: repos.firstOrNull()?.id)
+        }
+        LaunchedEffect(selectedRepoId) { selectedRepoId?.let(onSelectRepo) }
+        if (repos.size > 1) {
+            val selectedIndex = repos.indexOfFirst { it.id == selectedRepoId }.coerceAtLeast(0)
+            ScrollableTabRow(
+                selectedTabIndex = selectedIndex,
+                edgePadding = 16.dp,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                repos.forEachIndexed { index, repo ->
+                    Tab(
+                        selected = index == selectedIndex,
+                        onClick = { selectedRepoId = repo.id },
+                        text = { Text(repo.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // Versions offered by the selected repo (one repo lists each version once, so no dedup needed).
+        // This screen is a single (non-lazy) scroll column, so every row composes eagerly; apps with
+        // many versions froze the UI, so cap to the newest releases (already sorted newest-first).
+        val shownPackages = remember(packages, selectedRepoId) {
+            packages.filter { it.second.id == selectedRepoId }
+        }
+        // The release the Install button would pull from the selected repo gets the "suggested" badge,
+        // so the badge always matches what tapping Install actually does for this repo.
+        val suggestedVersion = remember(shownPackages, app.metadata.suggestedVersionCode) {
+            shownPackages.selectForDevice(app.metadata.suggestedVersionCode)?.first?.manifest?.versionCode
+        }
+        shownPackages.take(MAX_VERSIONS_SHOWN).forEach { (pkg, repo) ->
             val isSuggested = suggestedVersion != null && pkg.manifest.versionCode == suggestedVersion
             PackageItem(
                 item = pkg,
@@ -442,7 +484,7 @@ private fun AppDetail(
                     )
                 } else if (pkg.installed) {
                     Text(
-                        text = stringResource(R.string.suggested).uppercase(),
+                        text = stringResource(R.string.installed).uppercase(),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier
@@ -498,7 +540,7 @@ private fun HeaderSection(
             val version = app?.metadata?.suggestedVersionName?.takeIf { it.isNotBlank() } ?: ""
             if (version.isNotEmpty()) {
                 Text(
-                    text = "Version: $version",
+                    text = stringResource(R.string.version_FORMAT, version),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -512,21 +554,23 @@ private fun HeaderSection(
             )
         }
 
-        FilledTonalIconToggleButton(
+        // Just the heart, no container (the tonal toggle button squashed it into an oval): a larger
+        // filled red heart when favourited, a neutral outline when not.
+        IconToggleButton(
             checked = isFavorite,
             onCheckedChange = { onToggleFavorite() },
-            modifier = Modifier.size(
-                IconButtonDefaults.mediumContainerSize(IconButtonDefaults.IconButtonWidthOption.Narrow),
-            ),
         ) {
-            val icon = if (isFavorite) {
-                R.drawable.ic_favourite_checked
-            } else {
-                R.drawable.ic_favourite
-            }
             Icon(
-                painter = painterResource(icon),
-                contentDescription = null,
+                painter = painterResource(
+                    if (isFavorite) R.drawable.ic_favourite_checked else R.drawable.ic_favourite,
+                ),
+                contentDescription = stringResource(R.string.favourites),
+                tint = if (isFavorite) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.size(30.dp),
             )
         }
     }
@@ -740,7 +784,7 @@ private fun ScreenshotsRow(screenshots: List<FilePath>) {
                     is AsyncImagePainter.State.Success -> {
                         Image(
                             painter = painter,
-                            contentDescription = "screenshot",
+                            contentDescription = stringResource(R.string.screenshot),
                             modifier = Modifier.height(200.dp),
                             contentScale = ContentScale.FillHeight,
                         )
@@ -800,7 +844,7 @@ private fun ScreenshotViewer(
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "Close",
+                    contentDescription = stringResource(R.string.close),
                     tint = Color.White,
                 )
             }

@@ -94,13 +94,13 @@ fun RepoDetailScreen(
                     IconButton(onClick = { onEditClick(viewModel.repoId) }) {
                         Icon(
                             imageVector = Icons.Default.Edit,
-                            contentDescription = "Edit",
+                            contentDescription = stringResource(R.string.edit),
                         )
                     }
                     IconButton(onClick = { showDeleteDialog = true }) {
                         Icon(
                             imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete",
+                            contentDescription = stringResource(R.string.delete),
                         )
                     }
                 },
@@ -276,19 +276,19 @@ private fun DeleteRepositoryDialog(
                     .padding(12.dp),
             )
         },
-        title = { Text("Delete Repository") },
-        text = { Text("Are you sure you want to delete this repository?") },
+        title = { Text(stringResource(R.string.delete_repository)) },
+        text = { Text(stringResource(R.string.delete_repository_confirm)) },
         confirmButton = {
             Button(
                 onClick = onConfirm,
                 colors = ButtonDefaults.errorButtonColors(),
             ) {
-                Text("Delete")
+                Text(stringResource(R.string.delete))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         },
     )

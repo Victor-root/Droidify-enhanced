@@ -28,7 +28,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
@@ -218,13 +217,20 @@ class AppListViewModel @Inject constructor(
         (flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0
     }.getOrDefault(false)
 
-    fun toggleCategory(category: DefaultName) {
-        val currentCategories = _selectedCategories.value
-        _selectedCategories.value = if (currentCategories.contains(category)) {
-            currentCategories - category
-        } else {
-            currentCategories + category
-        }
+    // A curated carousel ("New apps" / "Recently updated" / "Most downloaded") opened as its own full
+    // page via its "see all" arrow; null = the Discover home. (Categories, by contrast, expand inline
+    // — see [expandedSections].)
+    private val _openedSection = MutableStateFlow<String?>(null)
+    val openedSection: StateFlow<String?> = _openedSection
+
+    /** Opens a curated carousel as its own full page. */
+    fun openSection(key: String) {
+        _openedSection.value = key
+    }
+
+    /** Returns from a carousel's "see all" page to the Discover home. */
+    fun closeSection() {
+        _openedSection.value = null
     }
 
     fun toggleFavouritesOnly() {
@@ -258,8 +264,26 @@ class AppListViewModel @Inject constructor(
             .flowOn(Dispatchers.Default)
             .asStateFlow(emptyList())
 
-    // Discover home sections the user expanded inline (a category name, or the "What's new" /
-    // "Recently updated" sentinels). Their app lists load on demand and collapse when toggled off.
+    /** Full app list for the carousel page the user opened via "see all" (empty when none is open).
+     *  Unlike the carousels above, this isn't capped to a row — it's the whole section. */
+    val openedSectionApps: StateFlow<List<AppMinimal>> =
+        combine(catalogChanges, statsChanges, _openedSection) { _, _, section -> section }
+            .mapLatest { section ->
+                when (section) {
+                    SECTION_WHATS_NEW ->
+                        appRepository.apps(sortOrder = SortOrder.ADDED).take(SECTION_PAGE_LIMIT)
+                    SECTION_RECENTLY_UPDATED ->
+                        appRepository.apps(sortOrder = SortOrder.UPDATED).take(SECTION_PAGE_LIMIT)
+                    SECTION_MOST_DOWNLOADED -> appRepository.mostDownloadedApps(SECTION_PAGE_LIMIT)
+                    else -> emptyList()
+                }
+            }
+            .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
+            .asStateFlow(emptyList())
+
+    // Categories the user expanded inline in the accordion (keyed by category name). Their app lists
+    // load on demand and collapse when the chevron is toggled off.
     private val _expandedSections = MutableStateFlow<Set<String>>(emptySet())
     val expandedSections: StateFlow<Set<String>> = _expandedSections
 
@@ -269,59 +293,22 @@ class AppListViewModel @Inject constructor(
         }
     }
 
-    /** Apps for each currently-expanded section (capped), re-loaded when the catalogue changes. */
+    /** Apps for each currently-expanded category (capped), re-loaded when the catalogue changes. */
     val expandedSectionApps: StateFlow<Map<String, List<AppMinimal>>> =
         combine(catalogChanges, _expandedSections) { catalog, sections -> catalog to sections }
             .mapLatest { (_, sections) ->
                 val result = mutableMapOf<String, List<AppMinimal>>()
-                for (key in sections) {
-                    result[key] = when (key) {
-                        SECTION_WHATS_NEW -> appRepository.apps(sortOrder = SortOrder.ADDED)
-                        SECTION_RECENTLY_UPDATED -> appRepository.apps(sortOrder = SortOrder.UPDATED)
-                        SECTION_MOST_DOWNLOADED -> appRepository.mostDownloadedApps(SECTION_EXPAND_LIMIT)
-                        // A category section — either an accordion row (key = category name) or a
-                        // per-category carousel (key = "::cat:" + name); both map to the category.
-                        else -> appRepository.apps(
-                            sortOrder = SortOrder.UPDATED,
-                            categoriesToInclude = listOf(key.removePrefix(SECTION_CAT_PREFIX)),
-                        )
-                    }.take(SECTION_EXPAND_LIMIT)
+                for (category in sections) {
+                    result[category] = appRepository.apps(
+                        sortOrder = SortOrder.UPDATED,
+                        categoriesToInclude = listOf(category),
+                    ).take(SECTION_EXPAND_LIMIT)
                 }
                 result.toMap()
             }
             .distinctUntilChanged()
             .flowOn(Dispatchers.Default)
             .asStateFlow(emptyMap())
-
-    /** How many per-category carousels the Discover home should show — set from the visible height so
-     *  the carousels fill roughly one screen, then the categories accordion follows. 0 disables them. */
-    private val _carouselCount = MutableStateFlow(0)
-
-    fun setCarouselCount(count: Int) {
-        _carouselCount.value = count
-    }
-
-    /** Per-category carousels for the Discover home: one row of apps per category, for as many
-     *  categories as [setCarouselCount] asks (empty when 0, so no extra queries run). */
-    val categoryCarousels: StateFlow<List<CategoryCarousel>> =
-        combine(catalogChanges, _carouselCount) { catalog, count -> catalog to count }
-            .distinctUntilChanged()
-            .mapLatest { (_, count) ->
-                if (count <= 0) {
-                    emptyList()
-                } else {
-                    appRepository.categories.first().take(count).mapNotNull { category ->
-                        val apps = appRepository.apps(
-                            sortOrder = SortOrder.UPDATED,
-                            categoriesToInclude = listOf(category),
-                        ).take(DISCOVER_ROW_COUNT)
-                        if (apps.isEmpty()) null else CategoryCarousel(category, apps)
-                    }
-                }
-            }
-            .distinctUntilChanged()
-            .flowOn(Dispatchers.Default)
-            .asStateFlow(emptyList())
 
     /** Persists the chosen sort order; [appsState] re-queries automatically. */
     fun setSortOrder(order: SortOrder) {
@@ -345,22 +332,15 @@ const val SECTION_WHATS_NEW = "::whats_new"
 const val SECTION_RECENTLY_UPDATED = "::recently_updated"
 const val SECTION_MOST_DOWNLOADED = "::most_downloaded"
 
-/** Prefix for a per-category carousel's expand key, so it expands independently of the same
- *  category's accordion row. */
-const val SECTION_CAT_PREFIX = "::cat:"
-
-/** Cap on apps shown when a Discover section is expanded inline (a quick "see more", not the whole
- *  catalogue). */
+/** Cap on apps shown when a category is expanded inline (a quick "see more", not the whole list). */
 private const val SECTION_EXPAND_LIMIT = 40
+
+/** Cap on a carousel's full "see all" page — plenty to browse, while keeping the list small enough
+ *  that opening/closing the page stays smooth (the whole catalogue would be thousands of rows). */
+private const val SECTION_PAGE_LIMIT = 200
 
 /** How often catalogue changes are allowed to refresh the lists (throttles the first-sync flood). */
 private const val CATALOG_REFRESH_MS = 500L
-
-/** One Discover carousel: a category and a row of its apps. */
-data class CategoryCarousel(
-    val category: DefaultName,
-    val apps: List<AppMinimal>,
-)
 
 private data class AppQuery(
     val search: String,

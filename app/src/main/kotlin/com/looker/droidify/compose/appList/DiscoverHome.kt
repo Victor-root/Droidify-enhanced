@@ -209,8 +209,8 @@ fun DiscoverCategories(
     }
 }
 
-/** One category row in the Discover accordion: icon + name + a chevron that points down when
- *  collapsed and up when expanded. Tapping toggles its inline app list. */
+/** One category row in the accordion: icon + name + a chevron (down when collapsed, up when
+ *  expanded). Tapping toggles its inline app list. */
 @Composable
 fun CategoryRow(category: String, expanded: Boolean = false, onClick: () -> Unit) {
     Row(
@@ -225,12 +225,14 @@ fun CategoryRow(category: String, expanded: Boolean = false, onClick: () -> Unit
             modifier = Modifier
                 .size(40.dp)
                 .clip(MaterialTheme.shapes.medium)
-                .background(MaterialTheme.colorScheme.secondaryContainer),
+                // The accent colour (red by default) for the icon, and the same colour at a low alpha
+                // for the tile — same hue, much softer fill — instead of the heavier secondaryContainer.
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
         ) {
             Icon(
                 imageVector = categoryIcon(category),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp),
             )
         }

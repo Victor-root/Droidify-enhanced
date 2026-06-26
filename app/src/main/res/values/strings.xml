@@ -254,6 +254,15 @@
     <string name="discover_new_apps">New apps</string>
     <string name="discover_recently_updated">Recently updated</string>
     <string name="discover_most_downloaded">Most downloaded</string>
+    <string name="no_installed_apps">No installed apps found</string>
+    <string name="everything_up_to_date">Everything is up to date</string>
+    <string name="delete_repository">Delete repository</string>
+    <string name="delete_repository_confirm">Are you sure you want to delete this repository?</string>
+    <string name="edit">Edit</string>
+    <string name="sort">Sort</string>
+    <string name="sync">Sync</string>
+    <string name="screenshot">Screenshot</string>
+    <string name="close">Close</string>
     <string name="categories">Categories</string>
     <string name="website">Project website</string>
     <string name="prefs_language_title">Language</string>
