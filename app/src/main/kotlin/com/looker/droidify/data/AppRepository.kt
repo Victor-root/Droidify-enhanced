@@ -66,6 +66,10 @@ class AppRepository @Inject constructor(
         }
     }
 
+    /** Number of apps currently in the catalogue. 0 means it's empty — e.g. before the first sync,
+     *  or after a schema migration reset the database. */
+    suspend fun appCount(): Int = withContext(Dispatchers.Default) { appDao.count() }
+
     /** Emits whenever the catalogue (apps/versions) changes, e.g. after a sync. */
     val catalogChanges: Flow<Int>
         get() = appDao.catalogSizeStream()

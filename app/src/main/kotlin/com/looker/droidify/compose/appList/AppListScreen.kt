@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -40,6 +41,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -144,6 +146,12 @@ fun AppListScreen(
     val enabledExternalApps = remember(externalApps) { externalApps.filter { it.enabled } }
     val externalUpdates = remember(enabledExternalApps) { enabledExternalApps.filter { it.hasUpdate } }
 
+    // First launch: the catalogue is still empty and a sync is running. Show a full-screen fetching
+    // state (like F-Droid) instead of an empty grid + thin banner. `newApps` is empty exactly when the
+    // catalogue has no apps, so it doubles as the "nothing loaded yet" signal. The External tab has
+    // its own content, so it's excluded.
+    val catalogLoading = isSyncing && newApps.isEmpty() && selectedTab != AppTab.EXTERNAL
+
     Scaffold(
         snackbarHost = { SnackbarHost(externalViewModel.snackbarHostState) },
         topBar = {
@@ -173,12 +181,17 @@ fun AppListScreen(
                     SearchBar(state = viewModel.searchQuery)
                     Spacer(Modifier.height(8.dp))
                 }
-                if (isSyncing) {
+                // While the full-screen fetching state is up, the thin banner is redundant.
+                if (isSyncing && !catalogLoading) {
                     SyncBanner()
                 }
             }
         },
     ) { contentPadding ->
+        if (catalogLoading) {
+            RepoFetchingState(modifier = Modifier.padding(contentPadding))
+            return@Scaffold
+        }
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             state = gridState,
@@ -332,6 +345,36 @@ private fun AppTabRow(
                 },
             )
         }
+    }
+}
+
+/**
+ * Full-screen state shown on first launch while the catalogue is being fetched — mirrors F-Droid: a
+ * centred label above the Material 3 expressive wavy loading indicator (themed with the app's accent),
+ * instead of an empty grid.
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun RepoFetchingState(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = stringResource(R.string.fetching_repositories),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(28.dp))
+        CircularWavyProgressIndicator(
+            modifier = Modifier.size(64.dp),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        )
     }
 }
 

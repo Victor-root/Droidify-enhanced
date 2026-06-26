@@ -149,6 +149,7 @@
     <string name="sync_repositories_automatically">Synchroniser les dépôts automatiquement</string>
     <string name="syncing">Synchronisation en cours</string>
     <string name="syncing_FORMAT">Synchronisation de %s en cours…</string>
+    <string name="fetching_repositories">Récupération des dépôts d\'applications…</string>
     <string name="unstable_updates">Mises à jour instables</string>
     <string name="upstream_source_code_is_not_free">Le code source en amont n’est pas libre</string>
     <string name="username">Nom d’utilisateur</string>
