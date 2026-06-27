@@ -135,6 +135,12 @@ fun Release.apkVersionToken(deviceAbis: List<String> = Build.SUPPORTED_ABIS.toLi
     return apk.updatedAt ?: apk.id?.toString() ?: apk.name
 }
 
+/** The file name of the APK this release would install (e.g. "GlassKeep-1.5.0.apk"), shown as the
+ *  "latest APK" line. Universal across repos — whatever the file is actually called — and often
+ *  carries the real APK version when the tag doesn't. Null when the release ships no APK. */
+fun Release.apkFileName(deviceAbis: List<String> = Build.SUPPORTED_ABIS.toList()): String? =
+    selectApkAsset(assets, deviceAbis)?.name
+
 private fun abiAliases(abi: String): List<String> = when (abi) {
     "arm64-v8a" -> listOf("arm64-v8a", "arm64", "aarch64")
     "armeabi-v7a" -> listOf("armeabi-v7a", "armeabi", "armv7", "arm32")

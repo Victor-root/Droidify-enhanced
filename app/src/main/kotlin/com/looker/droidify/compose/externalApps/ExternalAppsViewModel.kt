@@ -14,6 +14,7 @@ import com.looker.droidify.data.model.PackageName
 import com.looker.droidify.external.ExternalApi
 import com.looker.droidify.external.ExternalApp
 import com.looker.droidify.external.ExternalAppRepository
+import com.looker.droidify.external.apkFileName
 import com.looker.droidify.external.apkVersionToken
 import com.looker.droidify.external.parseExternalSource
 import com.looker.droidify.external.selectApkAsset
@@ -144,7 +145,11 @@ class ExternalAppsViewModel @Inject constructor(
                     return@withBusy
                 }
                 repository.addApp(
-                    app.copy(latestTag = release.tag, latestApkToken = release.apkVersionToken()),
+                    app.copy(
+                        latestTag = release.tag,
+                        latestApkToken = release.apkVersionToken(),
+                        latestApkName = release.apkFileName(),
+                    ),
                 )
                 snack(context.getString(R.string.external_added, app.repo))
             }
@@ -191,10 +196,20 @@ class ExternalAppsViewModel @Inject constructor(
             apps.value.filter { it.enabled }.forEach { app ->
                 val release = externalApi.latestReleaseFor(app) ?: return@forEach
                 // Track the APK file's identity, not just the tag, so updates are detected from the
-                // actual APK (see ExternalApp.hasUpdate).
+                // actual APK (see ExternalApp.hasUpdate); keep its file name for the "latest APK" line.
                 val token = release.apkVersionToken()
-                if (release.tag != app.latestTag || token != app.latestApkToken) {
-                    repository.upsertApp(app.copy(latestTag = release.tag, latestApkToken = token))
+                val apkName = release.apkFileName()
+                if (release.tag != app.latestTag ||
+                    token != app.latestApkToken ||
+                    apkName != app.latestApkName
+                ) {
+                    repository.upsertApp(
+                        app.copy(
+                            latestTag = release.tag,
+                            latestApkToken = token,
+                            latestApkName = apkName,
+                        ),
+                    )
                 }
             }
         }
@@ -312,6 +327,7 @@ class ExternalAppsViewModel @Inject constructor(
                     latestTag = release.tag,
                     installedApkToken = token,
                     latestApkToken = token,
+                    latestApkName = release.apkFileName(),
                 ),
             )
         } catch (e: CancellationException) {

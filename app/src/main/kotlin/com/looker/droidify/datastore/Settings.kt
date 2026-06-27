@@ -23,10 +23,10 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
- * Default accent color seed: Material Red 500 (#F44336).
- * The whole MD3 theme (light & dark) is generated from this single seed color.
+ * Default accent colour: Material Red #D32F2F — the maintainer's MaterialFiles fork red. Applied raw
+ * (vivid) as the primary/accent; the surface roles are generated from it.
  */
-val DEFAULT_THEME_COLOR: Int = 0xFFF44336.toInt()
+val DEFAULT_THEME_COLOR: Int = 0xFFD32F2F.toInt()
 
 @Serializable
 @OptIn(ExperimentalTime::class)

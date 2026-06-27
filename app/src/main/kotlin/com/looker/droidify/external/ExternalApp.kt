@@ -28,6 +28,9 @@ data class ExternalApp(
     val installedApkToken: String? = null,
     /** Identity of the APK in the latest release that actually ships one. */
     val latestApkToken: String? = null,
+    /** File name of the APK in the latest release (e.g. "GlassKeep-1.5.0.apk"), shown as the "latest
+     *  APK" line — universal across repos and often the real APK version when the tag isn't. */
+    val latestApkName: String? = null,
     /** Whether to consider pre-releases when picking the latest release. */
     val includePrereleases: Boolean = false,
     /** Whether this source is active. Disabled sources are hidden from the External tab and updates,

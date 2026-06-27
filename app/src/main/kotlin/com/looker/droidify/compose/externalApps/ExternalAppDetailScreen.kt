@@ -133,11 +133,16 @@ fun ExternalAppDetailScreen(
                     )
                     app.latestTag?.let { tag ->
                         Text(
-                            text = stringResource(
-                                R.string.external_repo_latest,
-                                app.provider.label,
-                                tag,
-                            ),
+                            text = stringResource(R.string.external_repo_latest, tag),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    // The tag is the project's own (server) version; the APK file name is the actual
+                    // build offered, shown separately since repos version/name them differently.
+                    app.latestApkName?.let { apkName ->
+                        Text(
+                            text = stringResource(R.string.external_latest_apk, apkName),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
