@@ -121,17 +121,26 @@ class ExternalAppsViewModel @Inject constructor(
     }
 
     /** Adds a project from any GitHub/GitLab/Codeberg URL after confirming it has a release. */
-    fun addSource(url: String, includePrereleases: Boolean) {
+    fun addSource(
+        url: String,
+        includePrereleases: Boolean,
+        customName: String = "",
+        muteUpdates: Boolean = false,
+    ) {
         val ref = parseExternalSource(url)
         if (ref == null) {
             snack(context.getString(R.string.external_invalid_url))
             return
         }
+        val trimmedName = customName.trim()
         val app = ExternalApp(
             provider = ref.provider,
             owner = ref.owner,
             repo = ref.repo,
             includePrereleases = includePrereleases,
+            muteUpdates = muteUpdates,
+            label = trimmedName.ifEmpty { ref.repo },
+            nameOverridden = trimmedName.isNotEmpty(),
         )
         if (apps.value.any { it.key == app.key }) {
             snack(context.getString(R.string.external_already_added, app.path))
@@ -148,11 +157,16 @@ class ExternalAppsViewModel @Inject constructor(
                 // already installed is matched and shows its real on-device name + icon right away,
                 // before the user installs it through us.
                 val packageId = externalApi.fetchPackageId(app)
-                val realLabel = packageId?.let { installedLabel(it) }
+                // Keep the user's custom name if set; otherwise use the installed app's on-device name.
+                val resolvedLabel = if (app.nameOverridden) {
+                    app.label
+                } else {
+                    packageId?.let { installedLabel(it) } ?: app.label
+                }
                 repository.addApp(
                     app.copy(
                         packageName = packageId,
-                        label = realLabel ?: app.label,
+                        label = resolvedLabel,
                         latestTag = release.tag,
                         latestApkToken = release.apkVersionToken(),
                         latestApkName = release.apkFileName(),
@@ -234,6 +248,41 @@ class ExternalAppsViewModel @Inject constructor(
         viewModelScope.launch { repository.upsertApp(app.copy(enabled = enabled)) }
     }
 
+    /** Applies edited per-source settings. Re-fetches the latest release when the pre-release setting
+     *  changed (it affects which release is picked). A blank name reverts to the auto-detected one. */
+    fun updateSource(
+        app: ExternalApp,
+        customName: String,
+        includePrereleases: Boolean,
+        muteUpdates: Boolean,
+    ) {
+        viewModelScope.launch {
+            val trimmedName = customName.trim()
+            val overridden = trimmedName.isNotEmpty()
+            val label = when {
+                overridden -> trimmedName
+                app.packageName != null -> installedLabel(app.packageName) ?: app.repo
+                else -> app.repo
+            }
+            var updated = app.copy(
+                label = label,
+                nameOverridden = overridden,
+                muteUpdates = muteUpdates,
+            )
+            if (includePrereleases != app.includePrereleases) {
+                updated = updated.copy(includePrereleases = includePrereleases)
+                externalApi.latestReleaseFor(updated)?.let { release ->
+                    updated = updated.copy(
+                        latestTag = release.tag,
+                        latestApkToken = release.apkVersionToken(),
+                        latestApkName = release.apkFileName(),
+                    )
+                }
+            }
+            repository.upsertApp(updated)
+        }
+    }
+
     /** Forces a re-query of which tracked apps are installed (e.g. after returning to the screen). */
     fun refreshInstalled() {
         installedRefresh.value++
@@ -248,6 +297,7 @@ class ExternalAppsViewModel @Inject constructor(
         viewModelScope.launch {
             val updated = withContext(Dispatchers.Default) {
                 apps.value.mapNotNull { app ->
+                    if (app.nameOverridden) return@mapNotNull null
                     val pkg = app.packageName ?: return@mapNotNull null
                     val realLabel = installedLabel(pkg) ?: return@mapNotNull null
                     if (realLabel != app.label) app.copy(label = realLabel) else null

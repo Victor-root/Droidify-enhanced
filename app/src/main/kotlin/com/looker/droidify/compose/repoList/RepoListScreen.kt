@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularWavyProgressIndicator
@@ -31,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -79,6 +81,7 @@ fun RepoListScreen(
     }
 
     var showAddExternal by rememberSaveable { mutableStateOf(false) }
+    var editingExternal by remember { mutableStateOf<ExternalApp?>(null) }
 
     Scaffold(
         snackbarHost = { SnackbarHost(externalViewModel.snackbarHostState) },
@@ -136,6 +139,7 @@ fun RepoListScreen(
                     app = app,
                     isInstalled = app.key in externalInstalledKeys,
                     onToggle = { externalViewModel.setSourceEnabled(app, !app.enabled) },
+                    onEdit = { editingExternal = app },
                     onRemove = { externalViewModel.remove(app.key) },
                 )
             }
@@ -156,9 +160,19 @@ fun RepoListScreen(
     if (showAddExternal) {
         AddExternalSourceDialog(
             onDismiss = { showAddExternal = false },
-            onAdd = { url, includePrereleases ->
-                externalViewModel.addSource(url, includePrereleases)
+            onAdd = { url, includePrereleases, customName, muteUpdates ->
+                externalViewModel.addSource(url, includePrereleases, customName, muteUpdates)
                 showAddExternal = false
+            },
+        )
+    }
+    editingExternal?.let { app ->
+        EditExternalSourceDialog(
+            app = app,
+            onDismiss = { editingExternal = null },
+            onSave = { customName, includePrereleases, muteUpdates ->
+                externalViewModel.updateSource(app, customName, includePrereleases, muteUpdates)
+                editingExternal = null
             },
         )
     }
@@ -232,6 +246,7 @@ private fun ExternalSourceItem(
     app: ExternalApp,
     isInstalled: Boolean,
     onToggle: () -> Unit,
+    onEdit: () -> Unit,
     onRemove: () -> Unit,
 ) {
     val contentAlpha = if (app.enabled) 1f else 0.4f
@@ -273,6 +288,12 @@ private fun ExternalSourceItem(
         ) {
             Icon(imageVector = Icons.Default.Check, contentDescription = null)
         }
+        IconButton(onClick = onEdit) {
+            Icon(
+                imageVector = Icons.Default.Edit,
+                contentDescription = stringResource(R.string.external_edit_source),
+            )
+        }
         IconButton(onClick = onRemove) {
             Icon(
                 painter = painterResource(R.drawable.ic_tabler_trash),
@@ -285,10 +306,12 @@ private fun ExternalSourceItem(
 @Composable
 private fun AddExternalSourceDialog(
     onDismiss: () -> Unit,
-    onAdd: (url: String, includePrereleases: Boolean) -> Unit,
+    onAdd: (url: String, includePrereleases: Boolean, customName: String, muteUpdates: Boolean) -> Unit,
 ) {
     var url by rememberSaveable { mutableStateOf("") }
+    var name by rememberSaveable { mutableStateOf("") }
     var includePrereleases by rememberSaveable { mutableStateOf(false) }
+    var muteUpdates by rememberSaveable { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.external_add_source)) },
@@ -301,32 +324,118 @@ private fun AddExternalSourceDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
-                        checked = includePrereleases,
-                        onCheckedChange = { includePrereleases = it },
-                    )
-                    Text(
-                        text = stringResource(R.string.external_include_prereleases),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
+                Spacer(Modifier.size(8.dp))
+                SourceOptionFields(
+                    name = name,
+                    onNameChange = { name = it },
+                    nameHint = null,
+                    includePrereleases = includePrereleases,
+                    onPrereleasesChange = { includePrereleases = it },
+                    muteUpdates = muteUpdates,
+                    onMuteChange = { muteUpdates = it },
+                )
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onAdd(url, includePrereleases) },
+                onClick = { onAdd(url, includePrereleases, name, muteUpdates) },
                 enabled = url.isNotBlank(),
             ) {
                 Text(stringResource(R.string.external_add))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
+}
+
+/** Edits an existing external source's settings (the URL is fixed, so it isn't shown). */
+@Composable
+private fun EditExternalSourceDialog(
+    app: ExternalApp,
+    onDismiss: () -> Unit,
+    onSave: (customName: String, includePrereleases: Boolean, muteUpdates: Boolean) -> Unit,
+) {
+    var name by rememberSaveable(app.key) {
+        mutableStateOf(if (app.nameOverridden) app.label else "")
+    }
+    var includePrereleases by rememberSaveable(app.key) { mutableStateOf(app.includePrereleases) }
+    var muteUpdates by rememberSaveable(app.key) { mutableStateOf(app.muteUpdates) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.external_edit_source)) },
+        text = {
+            Column {
+                Text(
+                    text = "${app.provider.label} · ${app.path}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.size(8.dp))
+                SourceOptionFields(
+                    name = name,
+                    onNameChange = { name = it },
+                    nameHint = app.label,
+                    includePrereleases = includePrereleases,
+                    onPrereleasesChange = { includePrereleases = it },
+                    muteUpdates = muteUpdates,
+                    onMuteChange = { muteUpdates = it },
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(name, includePrereleases, muteUpdates) }) {
+                Text(stringResource(R.string.external_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        },
+    )
+}
+
+/** Per-source option fields shared by the add and edit dialogs. */
+@Composable
+private fun SourceOptionFields(
+    name: String,
+    onNameChange: (String) -> Unit,
+    nameHint: String?,
+    includePrereleases: Boolean,
+    onPrereleasesChange: (Boolean) -> Unit,
+    muteUpdates: Boolean,
+    onMuteChange: (Boolean) -> Unit,
+) {
+    OutlinedTextField(
+        value = name,
+        onValueChange = onNameChange,
+        label = { Text(stringResource(R.string.external_custom_name)) },
+        placeholder = if (nameHint != null) {
+            { Text(nameHint) }
+        } else {
+            null
+        },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    CheckboxRow(
+        checked = includePrereleases,
+        onCheckedChange = onPrereleasesChange,
+        label = stringResource(R.string.external_include_prereleases),
+    )
+    CheckboxRow(
+        checked = muteUpdates,
+        onCheckedChange = onMuteChange,
+        label = stringResource(R.string.external_mute_updates),
+    )
+}
+
+@Composable
+private fun CheckboxRow(checked: Boolean, onCheckedChange: (Boolean) -> Unit, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+        Text(text = label, style = MaterialTheme.typography.bodyMedium)
+    }
 }
 
 val GrayScaleColorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })

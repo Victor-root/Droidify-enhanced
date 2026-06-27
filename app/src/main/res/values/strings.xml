@@ -332,6 +332,10 @@
     <string name="external_check_updates">Check for updates</string>
     <string name="external_source_url_label">Project URL (GitHub, GitLab, Codeberg)</string>
     <string name="external_include_prereleases">Include pre-releases</string>
+    <string name="external_edit_source">Edit source</string>
+    <string name="external_custom_name">Custom name (optional)</string>
+    <string name="external_mute_updates">Don\'t show updates for this source</string>
+    <string name="external_save">Save</string>
     <string name="external_empty_hint">Add a project (e.g. github.com/owner/repo) to install and update its release APKs directly, like Obtainium.</string>
     <string name="external_empty_tab">No external apps yet.\nAdd sources from the Repositories screen.</string>
     <string name="external_invalid_url">Not a valid project URL (GitHub, GitLab or Codeberg)</string>

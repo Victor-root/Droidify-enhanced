@@ -36,6 +36,12 @@ data class ExternalApp(
     /** Whether this source is active. Disabled sources are hidden from the External tab and updates,
      *  and skipped when checking for new releases — exactly like a disabled F-Droid repository. */
     val enabled: Boolean = true,
+    /** The [label] is a user-set custom name; when true it isn't overwritten by the installed app's
+     *  on-device name. */
+    val nameOverridden: Boolean = false,
+    /** "Track only": keep this source up to date but don't surface its updates (Updates tab and update
+     *  notifications) — useful for apps the user updates by other means. */
+    val muteUpdates: Boolean = false,
 ) {
     /** Stable identity for lists / de-duplication (provider-scoped, so the same owner/repo on two
      *  providers stays distinct). */

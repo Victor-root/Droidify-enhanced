@@ -326,6 +326,10 @@
     <string name="external_check_updates">Rechercher des mises à jour</string>
     <string name="external_source_url_label">URL du projet (GitHub, GitLab, Codeberg)</string>
     <string name="external_include_prereleases">Inclure les préversions</string>
+    <string name="external_edit_source">Modifier le dépôt</string>
+    <string name="external_custom_name">Nom personnalisé (facultatif)</string>
+    <string name="external_mute_updates">Ne pas afficher les mises à jour de ce dépôt</string>
+    <string name="external_save">Enregistrer</string>
     <string name="external_empty_hint">Ajoutez un projet (ex. github.com/auteur/depot) pour installer et mettre à jour ses APK de release directement, comme Obtainium.</string>
     <string name="external_empty_tab">Aucune app externe pour l\'instant.\nAjoutez des sources depuis l\'écran Dépôts.</string>
     <string name="external_invalid_url">URL de projet invalide (GitHub, GitLab ou Codeberg)</string>

@@ -267,7 +267,10 @@ fun AppListScreen(
     }
     // Disabled sources are hidden from the catalogue and updates, exactly like a disabled F-Droid repo.
     val enabledExternalApps = remember(externalApps) { externalApps.filter { it.enabled } }
-    val externalUpdates = remember(enabledExternalApps) { enabledExternalApps.filter { it.hasUpdate } }
+    // "Track only" sources keep updating in the background but are kept out of the Updates tab/count.
+    val externalUpdates = remember(enabledExternalApps) {
+        enabledExternalApps.filter { it.hasUpdate && !it.muteUpdates }
+    }
 
     // First launch: the catalogue is still empty and a sync is running. Show a full-screen fetching
     // state (like F-Droid) instead of an empty grid + thin banner. `newApps` is empty exactly when the
