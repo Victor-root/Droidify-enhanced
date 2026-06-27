@@ -557,30 +557,35 @@ private fun AppTabRow(
         selectedTabIndex = selectedTab.ordinal,
         containerColor = LocalAccentBarColor.current,
         contentColor = LocalOnAccentBarColor.current,
-        // The default indicator is colorScheme.primary — the same accent as the bar, so it vanishes
-        // against it. Draw our own underline in the on-accent colour (white on the red bar) and
-        // thicker so the selected tab clearly stands out. Material3's Modifier.tabIndicatorOffset
-        // isn't available in this version, so position it by hand from the tab's left/width.
+        // Mark the active tab with a short, thick, rounded white pill centred under its title (not a
+        // full-width bar, not a text underline). Material3's Modifier.tabIndicatorOffset is absent in
+        // this version, so place the pill by hand from the tab's left/width. Unselected tabs are dimmed.
         indicator = { tabPositions ->
             val index = selectedTab.ordinal
             if (index < tabPositions.size) {
-                val position = tabPositions[index]
+                val pos = tabPositions[index]
+                val pillWidth = 28.dp
                 Box(
                     Modifier
                         .fillMaxWidth()
                         .wrapContentSize(Alignment.BottomStart)
-                        .offset(x = position.left)
-                        .width(position.width)
-                        .height(3.dp)
+                        .offset(x = pos.left + (pos.width - pillWidth) / 2, y = (-8).dp)
+                        .width(pillWidth)
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(50))
                         .background(LocalOnAccentBarColor.current),
                 )
             }
         },
+        divider = {},
     ) {
         AppTab.entries.forEach { tab ->
+            val selected = tab == selectedTab
             Tab(
-                selected = tab == selectedTab,
+                selected = selected,
                 onClick = { onSelectTab(tab) },
+                selectedContentColor = LocalOnAccentBarColor.current,
+                unselectedContentColor = LocalOnAccentBarColor.current.copy(alpha = 0.7f),
                 text = {
                     val label = when (tab) {
                         AppTab.AVAILABLE -> stringResource(R.string.available)

@@ -23,10 +23,10 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
- * Default accent colour: Material Red #D32F2F — the maintainer's MaterialFiles fork red. Applied raw
- * (vivid) as the primary/accent; the surface roles are generated from it.
+ * Default accent colour: Material Green #4CAF50 — Android's colour, and a good match for the logo.
+ * Applied raw (vivid) as the primary/accent; the surface roles are generated from it.
  */
-val DEFAULT_THEME_COLOR: Int = 0xFFD32F2F.toInt()
+val DEFAULT_THEME_COLOR: Int = 0xFF4CAF50.toInt()
 
 @Serializable
 @OptIn(ExperimentalTime::class)

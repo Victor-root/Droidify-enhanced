@@ -4,8 +4,9 @@ package com.looker.droidify.compose.theme
  * The accent color swatches shown on the "Palette" tab of the theme picker.
  *
  * These are the Material colours used by the maintainer's MaterialFiles fork (mostly the _500 shades;
- * red is the deeper #D32F2F). They're applied raw (vivid) — see [DroidifyTheme]. The first entry (red)
- * is also the app's default accent — see [com.looker.droidify.datastore.DEFAULT_THEME_COLOR].
+ * red is the deeper #D32F2F). They're applied raw (vivid) — see [DroidifyTheme]. The app's default
+ * accent is green (#4CAF50), one of these entries — see
+ * [com.looker.droidify.datastore.DEFAULT_THEME_COLOR].
  */
 val accentColorPalette: List<Int> = listOf(
     0xFFD32F2F.toInt(), // red (default)

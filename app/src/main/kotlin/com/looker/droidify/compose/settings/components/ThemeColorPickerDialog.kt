@@ -1,5 +1,6 @@
 package com.looker.droidify.compose.settings.components
 
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,12 +24,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -76,8 +79,17 @@ fun ThemeColorPickerDialog(
                         onClick = { onColorSelected(DEFAULT_THEME_COLOR) },
                     )
                     if (showWallpaperOption) {
+                        // Preview the colour Material You actually derives from the wallpaper, NOT the
+                        // current theme's primary (which would just echo the active accent). Only shown
+                        // on Android 12+, where the dynamic scheme is available.
+                        val context = LocalContext.current
+                        val wallpaperColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            dynamicLightColorScheme(context).primary
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        }
                         LabeledSwatch(
-                            color = MaterialTheme.colorScheme.primaryContainer,
+                            color = wallpaperColor,
                             label = stringResource(R.string.theme_color_wallpaper),
                             selected = dynamicEnabled,
                             onClick = onWallpaperSelected,
@@ -89,8 +101,8 @@ fun ThemeColorPickerDialog(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    // Red is offered as "Default" above, so the grid starts at the next color.
-                    accentColorPalette.drop(1).forEach { argb ->
+                    // The default colour is offered as "Default" above, so leave it out of the grid.
+                    accentColorPalette.filter { it != DEFAULT_THEME_COLOR }.forEach { argb ->
                         ColorSwatch(
                             color = Color(argb),
                             selected = !dynamicEnabled && selectedColor == argb,
