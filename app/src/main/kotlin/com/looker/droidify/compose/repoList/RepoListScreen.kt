@@ -58,6 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.looker.droidify.R
 import com.looker.droidify.compose.components.BackButton
+import com.looker.droidify.compose.externalApps.AddSourceState
 import com.looker.droidify.compose.externalApps.ExternalAppIcon
 import com.looker.droidify.compose.externalApps.ExternalAppsViewModel
 import com.looker.droidify.data.model.Repo
@@ -166,8 +167,21 @@ fun RepoListScreen(
     }
 
     if (showAddExternal) {
+        val addState by externalViewModel.addState.collectAsStateWithLifecycle()
+        // Keep the dialog up (with a spinner) until the add actually finishes, then close on success —
+        // so a slow GitHub response can't make it look like nothing happened.
+        LaunchedEffect(addState) {
+            if (addState == AddSourceState.SUCCESS) {
+                showAddExternal = false
+                externalViewModel.consumeAddState()
+            }
+        }
         AddExternalSourceDialog(
-            onDismiss = { showAddExternal = false },
+            isLoading = addState == AddSourceState.LOADING,
+            onDismiss = {
+                showAddExternal = false
+                externalViewModel.consumeAddState()
+            },
             onAdd = { url, includePrereleases, customName, muteUpdates, apkFilter ->
                 externalViewModel.addSource(
                     url = url,
@@ -176,7 +190,6 @@ fun RepoListScreen(
                     muteUpdates = muteUpdates,
                     apkFilter = apkFilter,
                 )
-                showAddExternal = false
             },
         )
     }
@@ -329,8 +342,10 @@ private fun ExternalSourceItem(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun AddExternalSourceDialog(
+    isLoading: Boolean,
     onDismiss: () -> Unit,
     onAdd: (
         url: String,
@@ -346,37 +361,59 @@ private fun AddExternalSourceDialog(
     var muteUpdates by rememberSaveable { mutableStateOf(false) }
     var apkFilter by rememberSaveable { mutableStateOf("") }
     AlertDialog(
+        // Stay cancellable even while loading, so a slow/stuck request can't trap the user.
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.external_add_source)) },
         text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(
-                    value = url,
-                    onValueChange = { url = it },
-                    label = { Text(stringResource(R.string.external_source_url_label)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.size(8.dp))
-                SourceOptionFields(
-                    name = name,
-                    onNameChange = { name = it },
-                    nameHint = null,
-                    includePrereleases = includePrereleases,
-                    onPrereleasesChange = { includePrereleases = it },
-                    muteUpdates = muteUpdates,
-                    onMuteChange = { muteUpdates = it },
-                    apkFilter = apkFilter,
-                    onApkFilterChange = { apkFilter = it },
-                )
+            if (isLoading) {
+                // While the add runs (release lookup + repo metadata), show a clear "working" state so
+                // a slow network never looks like a no-op.
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    CircularWavyProgressIndicator()
+                    Text(
+                        text = stringResource(R.string.external_adding),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    OutlinedTextField(
+                        value = url,
+                        onValueChange = { url = it },
+                        label = { Text(stringResource(R.string.external_source_url_label)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.size(8.dp))
+                    SourceOptionFields(
+                        name = name,
+                        onNameChange = { name = it },
+                        nameHint = null,
+                        includePrereleases = includePrereleases,
+                        onPrereleasesChange = { includePrereleases = it },
+                        muteUpdates = muteUpdates,
+                        onMuteChange = { muteUpdates = it },
+                        apkFilter = apkFilter,
+                        onApkFilterChange = { apkFilter = it },
+                    )
+                }
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = { onAdd(url, includePrereleases, name, muteUpdates, apkFilter) },
-                enabled = url.isNotBlank(),
-            ) {
-                Text(stringResource(R.string.external_add))
+            if (!isLoading) {
+                TextButton(
+                    onClick = { onAdd(url, includePrereleases, name, muteUpdates, apkFilter) },
+                    enabled = url.isNotBlank(),
+                ) {
+                    Text(stringResource(R.string.external_add))
+                }
             }
         },
         dismissButton = {

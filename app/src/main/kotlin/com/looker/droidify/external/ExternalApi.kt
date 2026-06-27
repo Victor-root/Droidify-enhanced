@@ -28,10 +28,18 @@ class ExternalApi @Inject constructor(
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
+    /** Whether the most recent api.github.com request was rejected by the rate limit (HTTP 403/429 with
+     *  no remaining quota). Best-effort hint, read right after a failed call on the same coroutine. */
+    private var rateLimited = false
+
     /** The user's optional GitHub token, or null when unset. Sent only to api.github.com requests to
      *  lift the anonymous 60-requests/hour rate limit to 5000. */
     private suspend fun githubAuthToken(): String? =
         settingsRepository.getInitial().githubToken.trim().takeIf { it.isNotEmpty() }
+
+    /** True when the last GitHub call was rate-limited *and* no token is configured — i.e. the moment
+     *  to nudge the user that adding a token would lift the limit. */
+    suspend fun shouldSuggestGithubToken(): Boolean = rateLimited && githubAuthToken() == null
 
     suspend fun latestReleaseFor(app: ExternalApp): Release? =
         latestRelease(app.provider, app.owner, app.repo, app.includePrereleases, app.apkFilter)
@@ -270,6 +278,12 @@ class ExternalApi @Inject constructor(
                 header("X-GitHub-Api-Version", "2022-11-28")
                 githubAuthToken()?.let { header("Authorization", "Bearer $it") }
             }
+        }
+        if (github) {
+            // GitHub signals the rate limit with 403/429 and X-RateLimit-Remaining: 0.
+            val remaining = response.headers["X-RateLimit-Remaining"]?.toIntOrNull()
+            val status = response.status.value
+            rateLimited = (status == 403 || status == 429) && remaining == 0
         }
         return if (response.status.isSuccess()) response.bodyAsText() else null
     }

@@ -425,6 +425,7 @@ fun SettingsScreen(
                     },
                     icon = painterResource(R.drawable.ic_github),
                     dialogTitle = stringResource(R.string.github_token),
+                    helpText = stringResource(R.string.github_token_help),
                     onValueChange = viewModel::setGithubToken,
                 )
             }

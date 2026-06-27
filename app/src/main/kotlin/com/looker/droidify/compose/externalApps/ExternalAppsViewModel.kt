@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.SystemClock
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.ViewModel
@@ -98,7 +99,23 @@ class ExternalAppsViewModel @Inject constructor(
     private val _busy = MutableStateFlow<Set<String>>(emptySet())
     val busy: StateFlow<Set<String>> = _busy
 
+    /** Drives the Add-source dialog: it stays open with a spinner while the (network) add runs, then
+     *  closes itself on success. */
+    private val _addState = MutableStateFlow(AddSourceState.IDLE)
+    val addState: StateFlow<AddSourceState> = _addState
+
+    /** Acknowledge a finished add so the dialog state resets (called once the dialog has closed). If the
+     *  dialog was dismissed while still adding, cancel the in-flight work so a late success can't leave a
+     *  stale state that would auto-close the next dialog. */
+    fun consumeAddState() {
+        if (_addState.value == AddSourceState.LOADING) addJob?.cancel()
+        _addState.value = AddSourceState.IDLE
+    }
+
     private val downloadJobs = mutableMapOf<String, Job>()
+
+    /** The in-flight "add source" coroutine, so it can be cancelled if the dialog is dismissed mid-add. */
+    private var addJob: Job? = null
 
     /** When the last network refresh ran (elapsedRealtime), to throttle the per-screen-entry refresh. */
     private var lastNetworkRefreshAt = 0L
@@ -156,38 +173,56 @@ class ExternalAppsViewModel @Inject constructor(
             snack(context.getString(R.string.external_already_added, app.path))
             return
         }
-        viewModelScope.launch {
-            withBusy(app.key) {
-                val release = externalApi.latestReleaseFor(app)
-                if (release == null) {
-                    snack(context.getString(R.string.external_no_release, app.path))
-                    return@withBusy
+        addJob = viewModelScope.launch {
+            _addState.value = AddSourceState.LOADING
+            var added = false
+            try {
+                withBusy(app.key) {
+                    val release = externalApi.latestReleaseFor(app)
+                    if (release == null) {
+                        // A null release here is often the GitHub rate limit; if so (and no token is
+                        // set) nudge the user toward adding one instead of a generic "no release".
+                        val suggestToken = externalApi.shouldSuggestGithubToken()
+                        snack(
+                            message = if (suggestToken) {
+                                context.getString(R.string.external_rate_limited)
+                            } else {
+                                context.getString(R.string.external_no_release, app.path)
+                            },
+                            long = suggestToken,
+                        )
+                        return@withBusy
+                    }
+                    // Resolve the package id from the repo's build.gradle (Obtainium-style) so an app
+                    // that's already installed is matched and shows its real on-device name + icon right
+                    // away, before the user installs it through us.
+                    val packageId = externalApi.fetchPackageId(app)
+                    // Pull the app's real launcher icon AND its real name from the repo (Obtainium-style),
+                    // so the card shows both before anything is installed.
+                    val meta = externalApi.fetchRepoMetadata(app)
+                    // Name priority: a name the user typed, else the on-device name if it's already
+                    // installed, else the real name read from the repo manifest, else the repo name.
+                    val resolvedLabel = when {
+                        app.nameOverridden -> app.label
+                        else -> packageId?.let { installedLabel(it) } ?: meta.appName ?: app.label
+                    }
+                    repository.addApp(
+                        app.copy(
+                            packageName = packageId,
+                            label = resolvedLabel,
+                            repoIconUrl = meta.iconCandidates.firstOrNull(),
+                            iconChecked = true,
+                            latestTag = release.tag,
+                            latestApkToken = release.apkVersionToken(filter = app.apkFilter),
+                            latestApkName = release.apkFileName(filter = app.apkFilter),
+                        ),
+                    )
+                    snack(context.getString(R.string.external_added, app.repo))
+                    added = true
                 }
-                // Resolve the package id from the repo's build.gradle (Obtainium-style) so an app that's
-                // already installed is matched and shows its real on-device name + icon right away,
-                // before the user installs it through us.
-                val packageId = externalApi.fetchPackageId(app)
-                // Pull the app's real launcher icon AND its real name from the repo (Obtainium-style),
-                // so the card shows both before anything is installed.
-                val meta = externalApi.fetchRepoMetadata(app)
-                // Name priority: a name the user typed, else the on-device name if it's already
-                // installed, else the real name read from the repo manifest, else the repo name.
-                val resolvedLabel = when {
-                    app.nameOverridden -> app.label
-                    else -> packageId?.let { installedLabel(it) } ?: meta.appName ?: app.label
-                }
-                repository.addApp(
-                    app.copy(
-                        packageName = packageId,
-                        label = resolvedLabel,
-                        repoIconUrl = meta.iconCandidates.firstOrNull(),
-                        iconChecked = true,
-                        latestTag = release.tag,
-                        latestApkToken = release.apkVersionToken(filter = app.apkFilter),
-                        latestApkName = release.apkFileName(filter = app.apkFilter),
-                    ),
-                )
-                snack(context.getString(R.string.external_added, app.repo))
+            } finally {
+                // Success closes the dialog; any failure leaves it open (with the error snackbar shown).
+                _addState.value = if (added) AddSourceState.SUCCESS else AddSourceState.IDLE
             }
         }
     }
@@ -374,7 +409,15 @@ class ExternalAppsViewModel @Inject constructor(
         try {
             val release = externalApi.latestReleaseFor(app)
             if (release == null) {
-                snack(context.getString(R.string.external_unreachable, app.provider.label))
+                val suggestToken = externalApi.shouldSuggestGithubToken()
+                snack(
+                    message = if (suggestToken) {
+                        context.getString(R.string.external_rate_limited)
+                    } else {
+                        context.getString(R.string.external_unreachable, app.provider.label)
+                    },
+                    long = suggestToken,
+                )
                 return
             }
             val asset = selectApkAsset(release.assets, filter = app.apkFilter)
@@ -515,10 +558,18 @@ class ExternalAppsViewModel @Inject constructor(
         }
     }
 
-    private fun snack(message: String) {
-        viewModelScope.launch { snackbarHostState.showSnackbar(message) }
+    private fun snack(message: String, long: Boolean = false) {
+        viewModelScope.launch {
+            snackbarHostState.showSnackbar(
+                message = message,
+                duration = if (long) SnackbarDuration.Long else SnackbarDuration.Short,
+            )
+        }
     }
 }
+
+/** State of an in-progress "add external source" action, driving the dialog's loading UI. */
+enum class AddSourceState { IDLE, LOADING, SUCCESS }
 
 private val UNSAFE_FILE_CHARS = Regex("[^A-Za-z0-9._-]")
 
