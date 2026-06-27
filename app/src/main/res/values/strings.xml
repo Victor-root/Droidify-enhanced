@@ -235,6 +235,7 @@
     <string name="syncing">Syncing</string>
     <string name="syncing_FORMAT">Syncing %s…</string>
     <string name="fetching_repositories">Fetching application repositories…</string>
+    <string name="first_sync_hint">The first launch can take a few minutes while the catalogue downloads. Please wait — don\'t close the app.</string>
     <string name="system">System</string>
     <string name="tap_to_install_DESC">Tap to install</string>
     <string name="tap_to_resume_updates">Open the app to resume updates</string>
@@ -334,6 +335,10 @@
     <string name="external_include_prereleases">Include pre-releases</string>
     <string name="external_edit_source">Edit source</string>
     <string name="external_custom_name">Custom name (optional)</string>
+    <string name="external_apk_filter">APK filter (regex, optional)</string>
+    <string name="external_apk_filter_hint">Leave empty to pick the APK automatically by your device\'s architecture. Example: arm64</string>
+    <string name="external_icon_label">Icon</string>
+    <string name="external_icon_searching">Looking for icons in the repository…</string>
     <string name="external_mute_updates">Don\'t show updates for this source</string>
     <string name="external_save">Save</string>
     <string name="external_empty_hint">Add a project (e.g. github.com/owner/repo) to install and update its release APKs directly, like Obtainium.</string>

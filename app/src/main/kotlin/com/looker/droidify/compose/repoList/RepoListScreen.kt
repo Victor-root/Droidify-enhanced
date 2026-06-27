@@ -1,6 +1,11 @@
 package com.looker.droidify.compose.repoList
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +20,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -32,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -41,6 +48,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -160,18 +168,36 @@ fun RepoListScreen(
     if (showAddExternal) {
         AddExternalSourceDialog(
             onDismiss = { showAddExternal = false },
-            onAdd = { url, includePrereleases, customName, muteUpdates ->
-                externalViewModel.addSource(url, includePrereleases, customName, muteUpdates)
+            onAdd = { url, includePrereleases, customName, muteUpdates, apkFilter ->
+                externalViewModel.addSource(
+                    url = url,
+                    includePrereleases = includePrereleases,
+                    customName = customName,
+                    muteUpdates = muteUpdates,
+                    apkFilter = apkFilter,
+                )
                 showAddExternal = false
             },
         )
     }
     editingExternal?.let { app ->
+        // Launcher icons found in the repo, for the picker. null = still loading, empty = none found.
+        val iconCandidates by produceState<List<String>?>(initialValue = null, app.key) {
+            value = externalViewModel.loadIconCandidates(app)
+        }
         EditExternalSourceDialog(
             app = app,
+            iconCandidates = iconCandidates,
             onDismiss = { editingExternal = null },
-            onSave = { customName, includePrereleases, muteUpdates ->
-                externalViewModel.updateSource(app, customName, includePrereleases, muteUpdates)
+            onSave = { customName, includePrereleases, muteUpdates, apkFilter, iconUrl ->
+                externalViewModel.updateSource(
+                    app = app,
+                    customName = customName,
+                    includePrereleases = includePrereleases,
+                    muteUpdates = muteUpdates,
+                    apkFilter = apkFilter,
+                    iconUrl = iconUrl,
+                )
                 editingExternal = null
             },
         )
@@ -306,17 +332,24 @@ private fun ExternalSourceItem(
 @Composable
 private fun AddExternalSourceDialog(
     onDismiss: () -> Unit,
-    onAdd: (url: String, includePrereleases: Boolean, customName: String, muteUpdates: Boolean) -> Unit,
+    onAdd: (
+        url: String,
+        includePrereleases: Boolean,
+        customName: String,
+        muteUpdates: Boolean,
+        apkFilter: String,
+    ) -> Unit,
 ) {
     var url by rememberSaveable { mutableStateOf("") }
     var name by rememberSaveable { mutableStateOf("") }
     var includePrereleases by rememberSaveable { mutableStateOf(false) }
     var muteUpdates by rememberSaveable { mutableStateOf(false) }
+    var apkFilter by rememberSaveable { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.external_add_source)) },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
@@ -333,12 +366,14 @@ private fun AddExternalSourceDialog(
                     onPrereleasesChange = { includePrereleases = it },
                     muteUpdates = muteUpdates,
                     onMuteChange = { muteUpdates = it },
+                    apkFilter = apkFilter,
+                    onApkFilterChange = { apkFilter = it },
                 )
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onAdd(url, includePrereleases, name, muteUpdates) },
+                onClick = { onAdd(url, includePrereleases, name, muteUpdates, apkFilter) },
                 enabled = url.isNotBlank(),
             ) {
                 Text(stringResource(R.string.external_add))
@@ -354,23 +389,40 @@ private fun AddExternalSourceDialog(
 @Composable
 private fun EditExternalSourceDialog(
     app: ExternalApp,
+    iconCandidates: List<String>?,
     onDismiss: () -> Unit,
-    onSave: (customName: String, includePrereleases: Boolean, muteUpdates: Boolean) -> Unit,
+    onSave: (
+        customName: String,
+        includePrereleases: Boolean,
+        muteUpdates: Boolean,
+        apkFilter: String,
+        iconUrl: String?,
+    ) -> Unit,
 ) {
     var name by rememberSaveable(app.key) {
         mutableStateOf(if (app.nameOverridden) app.label else "")
     }
     var includePrereleases by rememberSaveable(app.key) { mutableStateOf(app.includePrereleases) }
     var muteUpdates by rememberSaveable(app.key) { mutableStateOf(app.muteUpdates) }
+    var apkFilter by rememberSaveable(app.key) { mutableStateOf(app.apkFilter ?: "") }
+    // The chosen icon URL; null means "use the account avatar / automatic".
+    var selectedIcon by rememberSaveable(app.key) { mutableStateOf(app.repoIconUrl) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.external_edit_source)) },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text(
                     text = "${app.provider.label} · ${app.path}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.size(12.dp))
+                IconPickerSection(
+                    candidates = iconCandidates,
+                    avatarUrl = app.iconUrl,
+                    selected = selectedIcon,
+                    onSelect = { selectedIcon = it },
                 )
                 Spacer(Modifier.size(8.dp))
                 SourceOptionFields(
@@ -381,17 +433,96 @@ private fun EditExternalSourceDialog(
                     onPrereleasesChange = { includePrereleases = it },
                     muteUpdates = muteUpdates,
                     onMuteChange = { muteUpdates = it },
+                    apkFilter = apkFilter,
+                    onApkFilterChange = { apkFilter = it },
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(name, includePrereleases, muteUpdates) }) {
+            TextButton(
+                onClick = { onSave(name, includePrereleases, muteUpdates, apkFilter, selectedIcon) },
+            ) {
                 Text(stringResource(R.string.external_save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         },
+    )
+}
+
+/**
+ * The icon picker shown in the edit dialog: the launcher icons found in the source repo, plus the
+ * account avatar, as selectable thumbnails. Selecting the avatar means "automatic". While the repo is
+ * being scanned a small spinner shows; when nothing is found the section is hidden and the card simply
+ * falls back to the avatar.
+ */
+@Composable
+private fun IconPickerSection(
+    candidates: List<String>?,
+    avatarUrl: String?,
+    selected: String?,
+    onSelect: (String?) -> Unit,
+) {
+    when {
+        candidates == null -> Row(verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            Spacer(Modifier.size(8.dp))
+            Text(
+                text = stringResource(R.string.external_icon_searching),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        candidates.isEmpty() -> Unit
+
+        else -> {
+            Text(
+                text = stringResource(R.string.external_icon_label),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Spacer(Modifier.size(8.dp))
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                candidates.forEach { url ->
+                    IconChoice(url = url, selected = selected == url, onClick = { onSelect(url) })
+                }
+                if (avatarUrl != null) {
+                    IconChoice(
+                        url = avatarUrl,
+                        selected = selected == null,
+                        onClick = { onSelect(null) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** A single selectable icon thumbnail, ringed in the accent colour when chosen. */
+@Composable
+private fun IconChoice(url: String, selected: Boolean, onClick: () -> Unit) {
+    val shape = MaterialTheme.shapes.large
+    AsyncImage(
+        model = url,
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier
+            .size(56.dp)
+            .clip(shape)
+            .border(
+                width = if (selected) 2.dp else 1.dp,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.outlineVariant
+                },
+                shape = shape,
+            )
+            .clickable(onClick = onClick),
     )
 }
 
@@ -405,6 +536,8 @@ private fun SourceOptionFields(
     onPrereleasesChange: (Boolean) -> Unit,
     muteUpdates: Boolean,
     onMuteChange: (Boolean) -> Unit,
+    apkFilter: String,
+    onApkFilterChange: (String) -> Unit,
 ) {
     OutlinedTextField(
         value = name,
@@ -415,6 +548,15 @@ private fun SourceOptionFields(
         } else {
             null
         },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Spacer(Modifier.size(8.dp))
+    OutlinedTextField(
+        value = apkFilter,
+        onValueChange = onApkFilterChange,
+        label = { Text(stringResource(R.string.external_apk_filter)) },
+        supportingText = { Text(stringResource(R.string.external_apk_filter_hint)) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
