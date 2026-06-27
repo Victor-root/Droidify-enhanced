@@ -98,7 +98,7 @@ class ExternalApi @Inject constructor(
     /**
      * Resolves the app's user-facing name from its manifest's `<application android:label>` — the same
      * value the launcher shows. A literal label is used as-is; an `@string/name` reference is resolved
-     * from the module's `res/values/*.xml` (split string files included). Tries the manifests most
+     * from the module's `res/values` string files (split files included). Tries the manifests most
      * likely to be the app module first, skipping library modules that carry no application label.
      * Returns null when it can't be determined (the UI then keeps the repo name).
      */
@@ -116,7 +116,7 @@ class ExternalApi @Inject constructor(
         return null
     }
 
-    /** Finds `<string name="[name]">value</string>` in the module's default `res/values/*.xml`. */
+    /** Finds the `<string name="[name]">` value in the module's default `res/values` string files. */
     private suspend fun resolveStringResource(
         app: ExternalApp,
         paths: List<String>,
@@ -306,12 +306,25 @@ private data class ScoredIcon(val path: String, val stem: String, val variant: I
 /**
  * Ranks raw repo file paths as launcher-icon candidates and returns the best path per icon family
  * (e.g. square / round / foreground), best first. Universal across the common Android conventions:
- * any `mipmap-*` or `drawable-*` resource directory, raster PNG/WebP only (adaptive/vector .xml is
- * skipped — it can't be shown as a plain image), and the usual launcher names (`ic_launcher`, `icon`,
- * `launcher`, `app_icon`…) at any path depth, so Flutter/multi-module repos work too.
+ * the Fastlane / F-Droid store icon (`metadata/.../images/icon.png`), plus any `mipmap-*` or
+ * `drawable-*` resource directory, raster PNG/WebP only (adaptive/vector .xml is skipped — it can't be
+ * shown as a plain image), and the usual launcher names (`ic_launcher`, `icon`, `launcher`,
+ * `app_icon`…) at any path depth, so Flutter/multi-module repos work too. The store icon is the only
+ * raster many modern apps ship (their launcher icon being pure adaptive/vector), so it doubles as the
+ * fallback for those.
  */
 private fun rankIconPaths(paths: List<String>): List<String> {
-    val scored = paths.mapNotNull { path ->
+    val candidates = mutableListOf<ScoredIcon>()
+
+    // The Fastlane / F-Droid store icon: a full-res composed raster. Scored as a composed square (so it
+    // beats a transparent foreground) at a high — but not maximal — density, so a real high-density
+    // mipmap icon still wins when present, while vector-only apps fall back to this. Prefer en-US.
+    paths.filter { isStoreIcon(it) }.minByOrNull { storeIconOrder(it) }?.let {
+        candidates += ScoredIcon(path = it, stem = "@store", variant = 4, density = 5)
+    }
+
+    // Launcher icons from res/: keep the highest density of each named icon family.
+    paths.mapNotNull { path ->
         val file = path.substringAfterLast('/')
         val ext = file.substringAfterLast('.', "").lowercase()
         if (ext != "png" && ext != "webp") return@mapNotNull null
@@ -321,14 +334,34 @@ private fun rankIconPaths(paths: List<String>): List<String> {
         val variant = iconVariantRank(stem) ?: return@mapNotNull null
         ScoredIcon(path, stem, variant, densityRank(dir))
     }
-    // Collapse the density duplicates of each named icon to its highest density, then order by
-    // variant (square > round > foreground > other) and density.
-    return scored
         .groupBy { it.stem }
-        .map { (_, sameStem) -> sameStem.maxByOrNull { it.density }!! }
+        .forEach { (_, sameStem) -> candidates += sameStem.maxByOrNull { it.density }!! }
+
+    // Order by variant (square > round > foreground), then density.
+    return candidates
         .sortedWith(compareByDescending<ScoredIcon> { it.variant }.thenByDescending { it.density })
         .map { it.path }
+        .distinct()
         .take(MAX_ICON_CANDIDATES)
+}
+
+/** A Fastlane / F-Droid store-listing icon (`…/metadata/…/images/icon.png`). */
+private fun isStoreIcon(path: String): Boolean {
+    val lower = path.lowercase()
+    return "metadata" in lower &&
+        (lower.endsWith("/images/icon.png") ||
+            lower.endsWith("/images/icon.webp") ||
+            lower.endsWith("/images/icon.jpg"))
+}
+
+/** Prefer the English store icon when a repo ships per-locale copies (they're the same image). */
+private fun storeIconOrder(path: String): Int {
+    val lower = path.lowercase()
+    return when {
+        "/en-us/" in lower -> 0
+        "/en/" in lower -> 1
+        else -> 2
+    }
 }
 
 /**
@@ -345,13 +378,13 @@ private fun iconVariantRank(stem: String): Int? {
     val launcherish = stem.startsWith("ic_launcher") || stem.startsWith("icon") ||
         stem.startsWith("appicon") || stem.startsWith("app_icon") || stem.contains("launcher")
     if (!launcherish) return null
+    // A "_foreground"/"_round" suffix marks an adaptive component; any other launcher-ish base name
+    // (ic_launcher, launcher_icon, icon…) is the fully-composed square icon and is preferred — so a
+    // transparent foreground never outranks the real icon, whatever the project names it.
     return when {
         stem.endsWith("_foreground") -> 2
         stem.endsWith("_round") -> 3
-        // Bare square icon: ic_launcher, icon, launcher, appicon, app_icon (no variant suffix).
-        stem == "ic_launcher" || stem == "icon" || stem == "launcher" ||
-            stem == "appicon" || stem == "app_icon" -> 4
-        else -> 1
+        else -> 4
     }
 }
 
