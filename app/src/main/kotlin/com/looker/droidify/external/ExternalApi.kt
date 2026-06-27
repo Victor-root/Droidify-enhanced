@@ -1,5 +1,6 @@
 package com.looker.droidify.external
 
+import android.util.Base64
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -7,6 +8,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import java.net.URLEncoder
@@ -26,6 +28,35 @@ class ExternalApi @Inject constructor(
 
     suspend fun latestReleaseFor(app: ExternalApp): Release? =
         latestRelease(app.provider, app.owner, app.repo, app.includePrereleases)
+
+    /**
+     * Best-effort application id of the app a source builds, read from its `build.gradle`'s
+     * `applicationId` (falling back to `namespace`) — the same trick Obtainium uses. Knowing the
+     * package id lets an already-installed app be matched, so its real on-device name and icon show
+     * before the user ever installs through us. GitHub and Codeberg/Gitea expose file contents the same
+     * way; GitLab isn't covered (falls back to the repo name + avatar). Returns null when no build file
+     * or id can be found. Never throws.
+     */
+    suspend fun fetchPackageId(app: ExternalApp): String? = withContext(Dispatchers.IO) {
+        val base = when (app.provider) {
+            SourceProvider.GITHUB ->
+                "https://api.github.com/repos/${app.owner}/${app.repo}/contents"
+
+            SourceProvider.CODEBERG ->
+                "https://codeberg.org/api/v1/repos/${app.owner}/${app.repo}/contents"
+
+            SourceProvider.GITLAB -> return@withContext null
+        }
+        val github = app.provider == SourceProvider.GITHUB
+        for (path in BUILD_GRADLE_PATHS) {
+            val text = runCatching { getText("$base/$path", github = github) }.getOrNull() ?: continue
+            val source = decodeContentsBase64(text) ?: continue
+            for (regex in PACKAGE_ID_REGEXES) {
+                regex.find(source)?.let { return@withContext it.groupValues[1] }
+            }
+        }
+        null
+    }
 
     /**
      * The project README as HTML, for display on the detail screen. GitHub renders it for us
@@ -119,5 +150,36 @@ class ExternalApi @Inject constructor(
             }
         }
         return if (response.status.isSuccess()) response.bodyAsText() else null
+    }
+
+    /** Decodes the base64 `content` field of a GitHub/Gitea "contents" API response into text. */
+    private fun decodeContentsBase64(text: String): String? {
+        val dto = runCatching {
+            json.decodeFromString(ContentsDto.serializer(), text)
+        }.getOrNull() ?: return null
+        if (dto.encoding != "base64" || dto.content == null) return null
+        return runCatching {
+            String(Base64.decode(dto.content.replace("\n", ""), Base64.DEFAULT))
+        }.getOrNull()
+    }
+
+    @Serializable
+    private data class ContentsDto(val content: String? = null, val encoding: String? = null)
+
+    private companion object {
+        /** Where an Android app's `applicationId` usually lives, most likely first. */
+        val BUILD_GRADLE_PATHS = listOf(
+            "app/build.gradle.kts",
+            "app/build.gradle",
+            "android/app/build.gradle.kts",
+            "android/app/build.gradle",
+            "src/app/build.gradle",
+        )
+
+        /** `applicationId`, else `namespace`, in either Groovy or Kotlin-DSL form. */
+        val PACKAGE_ID_REGEXES = listOf(
+            Regex("""applicationId\s*[=(]?\s*["']([\w.]+)["']"""),
+            Regex("""namespace\s*[=(]?\s*["']([\w.]+)["']"""),
+        )
     }
 }

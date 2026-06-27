@@ -141,6 +141,13 @@ fun Release.apkVersionToken(deviceAbis: List<String> = Build.SUPPORTED_ABIS.toLi
 fun Release.apkFileName(deviceAbis: List<String> = Build.SUPPORTED_ABIS.toList()): String? =
     selectApkAsset(assets, deviceAbis)?.name
 
+private val versionInFileName = Regex("""\d+(?:\.\d+)+""")
+
+/** Pulls a dotted version number out of an APK file name (e.g. "GlassKeep-v1.4.6.apk" -> "1.4.6") for
+ *  a tidy "latest APK" line, falling back to the whole file name when none is present. */
+fun apkVersionLabel(fileName: String): String =
+    versionInFileName.find(fileName)?.value ?: fileName
+
 private fun abiAliases(abi: String): List<String> = when (abi) {
     "arm64-v8a" -> listOf("arm64-v8a", "arm64", "aarch64")
     "armeabi-v7a" -> listOf("armeabi-v7a", "armeabi", "armv7", "arm32")

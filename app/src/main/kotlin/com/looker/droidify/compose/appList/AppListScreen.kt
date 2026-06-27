@@ -308,7 +308,11 @@ fun AppListScreen(
                         currentSort = sortOrder,
                         onSortSelected = viewModel::setSortOrder,
                         title = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Pull the whole logo+wordmark left, past the top bar's default title inset.
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.offset(x = (-16).dp),
+                            ) {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_launcher_monochrome),
                                     contentDescription = null,

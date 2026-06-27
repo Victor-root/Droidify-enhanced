@@ -144,8 +144,15 @@ class ExternalAppsViewModel @Inject constructor(
                     snack(context.getString(R.string.external_no_release, app.path))
                     return@withBusy
                 }
+                // Resolve the package id from the repo's build.gradle (Obtainium-style) so an app that's
+                // already installed is matched and shows its real on-device name + icon right away,
+                // before the user installs it through us.
+                val packageId = externalApi.fetchPackageId(app)
+                val realLabel = packageId?.let { installedLabel(it) }
                 repository.addApp(
                     app.copy(
+                        packageName = packageId,
+                        label = realLabel ?: app.label,
                         latestTag = release.tag,
                         latestApkToken = release.apkVersionToken(),
                         latestApkName = release.apkFileName(),
@@ -199,12 +206,18 @@ class ExternalAppsViewModel @Inject constructor(
                 // actual APK (see ExternalApp.hasUpdate); keep its file name for the "latest APK" line.
                 val token = release.apkVersionToken()
                 val apkName = release.apkFileName()
+                // Backfill the package id (from build.gradle) for sources added before this existed, so
+                // an installed app starts showing its real name + icon; the existing label reconcile
+                // then fills in the on-device name. Never overwrites an id already learned from install.
+                val packageId = app.packageName ?: externalApi.fetchPackageId(app)
                 if (release.tag != app.latestTag ||
                     token != app.latestApkToken ||
-                    apkName != app.latestApkName
+                    apkName != app.latestApkName ||
+                    packageId != app.packageName
                 ) {
                     repository.upsertApp(
                         app.copy(
+                            packageName = packageId,
                             latestTag = release.tag,
                             latestApkToken = token,
                             latestApkName = apkName,
