@@ -24,11 +24,13 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
@@ -68,8 +70,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
-import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -313,7 +313,7 @@ fun AppListScreen(
                                     painter = painterResource(R.drawable.ic_launcher_monochrome),
                                     contentDescription = null,
                                     tint = LocalOnAccentBarColor.current,
-                                    modifier = Modifier.size(40.dp),
+                                    modifier = Modifier.size(48.dp),
                                 )
                                 Text("Droid-ify")
                             }
@@ -558,15 +558,21 @@ private fun AppTabRow(
         containerColor = LocalAccentBarColor.current,
         contentColor = LocalOnAccentBarColor.current,
         // The default indicator is colorScheme.primary — the same accent as the bar, so it vanishes
-        // against it. Draw it in the on-accent colour (white on the red bar) and thicker so the
-        // selected tab clearly stands out.
+        // against it. Draw our own underline in the on-accent colour (white on the red bar) and
+        // thicker so the selected tab clearly stands out. Material3's Modifier.tabIndicatorOffset
+        // isn't available in this version, so position it by hand from the tab's left/width.
         indicator = { tabPositions ->
             val index = selectedTab.ordinal
             if (index < tabPositions.size) {
-                TabRowDefaults.SecondaryIndicator(
-                    modifier = Modifier.tabIndicatorOffset(tabPositions[index]),
-                    height = 3.dp,
-                    color = LocalOnAccentBarColor.current,
+                val position = tabPositions[index]
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .wrapContentSize(Alignment.BottomStart)
+                        .offset(x = position.left)
+                        .width(position.width)
+                        .height(3.dp)
+                        .background(LocalOnAccentBarColor.current),
                 )
             }
         },
@@ -739,6 +745,11 @@ fun SearchBar(
  * The header turned into a search field: a back arrow (folds it away) + a full-width input that
  * auto-focuses so the keyboard opens immediately.
  */
+/** The home bars (main + search) are a little taller than the other screens' compact [AccentBarHeight]
+ *  so the home logo + wordmark have room to be prominent. Shared by both so toggling search doesn't
+ *  change the bar height. */
+private val HomeBarHeight = 64.dp
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SearchTopBar(
@@ -749,7 +760,7 @@ private fun SearchTopBar(
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
     TopAppBar(
         colors = accentTopAppBarColors(),
-        expandedHeight = AccentBarHeight,
+        expandedHeight = HomeBarHeight,
         navigationIcon = {
             IconButton(onClick = onClose) {
                 Icon(
@@ -838,7 +849,7 @@ private fun AppListMainTopBar(
     val context = LocalContext.current
     TopAppBar(
         colors = accentTopAppBarColors(),
-        expandedHeight = AccentBarHeight,
+        expandedHeight = HomeBarHeight,
         title = title,
         actions = {
             IconButton(

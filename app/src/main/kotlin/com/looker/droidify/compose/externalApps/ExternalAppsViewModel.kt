@@ -14,6 +14,7 @@ import com.looker.droidify.data.model.PackageName
 import com.looker.droidify.external.ExternalApi
 import com.looker.droidify.external.ExternalApp
 import com.looker.droidify.external.ExternalAppRepository
+import com.looker.droidify.external.apkVersionToken
 import com.looker.droidify.external.parseExternalSource
 import com.looker.droidify.external.selectApkAsset
 import com.looker.droidify.installer.InstallManager
@@ -142,7 +143,9 @@ class ExternalAppsViewModel @Inject constructor(
                     snack(context.getString(R.string.external_no_release, app.path))
                     return@withBusy
                 }
-                repository.addApp(app.copy(latestTag = release.tag))
+                repository.addApp(
+                    app.copy(latestTag = release.tag, latestApkToken = release.apkVersionToken()),
+                )
                 snack(context.getString(R.string.external_added, app.repo))
             }
         }
@@ -186,9 +189,12 @@ class ExternalAppsViewModel @Inject constructor(
     fun refresh() {
         viewModelScope.launch {
             apps.value.filter { it.enabled }.forEach { app ->
-                val release = externalApi.latestReleaseFor(app)
-                if (release != null && release.tag != app.latestTag) {
-                    repository.upsertApp(app.copy(latestTag = release.tag))
+                val release = externalApi.latestReleaseFor(app) ?: return@forEach
+                // Track the APK file's identity, not just the tag, so updates are detected from the
+                // actual APK (see ExternalApp.hasUpdate).
+                val token = release.apkVersionToken()
+                if (release.tag != app.latestTag || token != app.latestApkToken) {
+                    repository.upsertApp(app.copy(latestTag = release.tag, latestApkToken = token))
                 }
             }
         }
@@ -295,12 +301,17 @@ class ExternalAppsViewModel @Inject constructor(
             // Read the real icon + app name from the APK we just downloaded (releases carry neither).
             val realLabel = cacheIconAndReadLabel(releaseFile.absolutePath, app.key)
             installManager.install(InstallItem(PackageName(packageName), cacheFileName))
+            // Record which APK file this is (its identity), so future update checks compare the APK,
+            // not the tag. We just installed the latest release, so installed and latest match.
+            val token = release.apkVersionToken()
             repository.upsertApp(
                 app.copy(
                     packageName = packageName,
                     label = realLabel ?: app.label,
                     installedTag = release.tag,
                     latestTag = release.tag,
+                    installedApkToken = token,
+                    latestApkToken = token,
                 ),
             )
         } catch (e: CancellationException) {

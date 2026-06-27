@@ -18,6 +18,11 @@ data class Release(
 data class ReleaseAsset(
     val name: String,
     val downloadUrl: String,
+    /** When the file itself was last uploaded (GitHub/Gitea); null for providers that don't expose it.
+     *  ISO-8601, so it sorts chronologically. Changes only when the file is actually re-uploaded. */
+    val updatedAt: String? = null,
+    /** Provider-assigned id of the uploaded file; null for providers that don't expose it. */
+    val id: Long? = null,
 )
 
 /**
@@ -36,7 +41,14 @@ data class RestReleaseDto(
     fun toRelease(): Release = Release(
         tag = tagName,
         isPrerelease = prerelease,
-        assets = assets.map { ReleaseAsset(it.name, it.browserDownloadUrl) },
+        assets = assets.map {
+            ReleaseAsset(
+                name = it.name,
+                downloadUrl = it.browserDownloadUrl,
+                updatedAt = it.updatedAt ?: it.createdAt,
+                id = it.id.takeIf { id -> id != 0L },
+            )
+        },
     )
 }
 
@@ -45,6 +57,9 @@ data class RestAssetDto(
     val name: String,
     @SerialName("browser_download_url") val browserDownloadUrl: String,
     val size: Long = 0,
+    val id: Long = 0,
+    @SerialName("updated_at") val updatedAt: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
 )
 
 /**
@@ -106,6 +121,18 @@ fun selectApkAsset(
         val name = apk.name.lowercase()
         "universal" in name || "noarch" in name || "all" in name
     } ?: apks.first()
+}
+
+/**
+ * A stable identity for the APK this release would install: the file's upload time (GitHub/Gitea),
+ * falling back to its provider id, then its name. This tracks the actual APK rather than the release
+ * tag — the tag is the project's own (server) version and can change with no new APK, so comparing
+ * tags falsely flags updates. The token changes only when the APK file itself is re-uploaded.
+ * Returns null when the release ships no APK.
+ */
+fun Release.apkVersionToken(deviceAbis: List<String> = Build.SUPPORTED_ABIS.toList()): String? {
+    val apk = selectApkAsset(assets, deviceAbis) ?: return null
+    return apk.updatedAt ?: apk.id?.toString() ?: apk.name
 }
 
 private fun abiAliases(abi: String): List<String> = when (abi) {
