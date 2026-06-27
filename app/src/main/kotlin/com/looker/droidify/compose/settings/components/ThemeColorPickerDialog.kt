@@ -1,6 +1,6 @@
 package com.looker.droidify.compose.settings.components
 
-import android.content.res.Configuration
+import android.view.ContextThemeWrapper
 import androidx.appcompat.R as AppCompatR
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -122,21 +122,21 @@ fun ThemeColorPickerDialog(
 /**
  * The actual accent colour a seed produces in the header — i.e. the Material 3 primary generated from
  * it, read back exactly as the app does at runtime ([toComposeColorScheme] uses colorPrimary), rather
- * than the raw seed (which looks noticeably more orange than the muted generated red). Generated in a
- * forced-light context because the header always shows the light primary (in dark mode it uses
- * inversePrimary, which equals the light primary).
+ * than the raw seed (which looks noticeably more orange than the muted generated red).
+ *
+ * The overlay is applied on top of the app's real Material 3 LIGHT theme ([R.style.Theme_Main_Light]),
+ * the same base the activity uses in light mode, so every colour role is actually defined — wrapping a
+ * bare/config-only context instead left `colorPrimary` undefined, so it fell back to the raw seed (the
+ * orange the user saw). The light theme is correct in both modes: the header shows the light primary,
+ * and in dark mode it uses inversePrimary, which equals it.
  */
 @Composable
 private fun rememberAccentPreview(seed: Int): Color {
     val context = LocalContext.current
     return remember(seed, context) {
-        val lightConfig = Configuration(context.resources.configuration).apply {
-            uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
-                Configuration.UI_MODE_NIGHT_NO
-        }
-        val lightContext = context.createConfigurationContext(lightConfig)
+        val lightBase = ContextThemeWrapper(context, R.style.Theme_Main_Light)
         val options = DynamicColorsOptions.Builder().setContentBasedSource(seed).build()
-        val themed = DynamicColors.wrapContextIfAvailable(lightContext, options)
+        val themed = DynamicColors.wrapContextIfAvailable(lightBase, options)
         Color(MaterialColors.getColor(themed, AppCompatR.attr.colorPrimary, seed))
     }
 }

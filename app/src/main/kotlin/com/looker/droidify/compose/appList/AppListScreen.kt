@@ -68,6 +68,8 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -311,7 +313,7 @@ fun AppListScreen(
                                     painter = painterResource(R.drawable.ic_launcher_monochrome),
                                     contentDescription = null,
                                     tint = LocalOnAccentBarColor.current,
-                                    modifier = Modifier.size(28.dp),
+                                    modifier = Modifier.size(40.dp),
                                 )
                                 Text("Droid-ify")
                             }
@@ -555,6 +557,19 @@ private fun AppTabRow(
         selectedTabIndex = selectedTab.ordinal,
         containerColor = LocalAccentBarColor.current,
         contentColor = LocalOnAccentBarColor.current,
+        // The default indicator is colorScheme.primary — the same accent as the bar, so it vanishes
+        // against it. Draw it in the on-accent colour (white on the red bar) and thicker so the
+        // selected tab clearly stands out.
+        indicator = { tabPositions ->
+            val index = selectedTab.ordinal
+            if (index < tabPositions.size) {
+                TabRowDefaults.SecondaryIndicator(
+                    modifier = Modifier.tabIndicatorOffset(tabPositions[index]),
+                    height = 3.dp,
+                    color = LocalOnAccentBarColor.current,
+                )
+            }
+        },
     ) {
         AppTab.entries.forEach { tab ->
             Tab(
