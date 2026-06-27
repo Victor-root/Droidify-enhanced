@@ -1,6 +1,7 @@
 package com.looker.droidify.external
 
 import android.util.Base64
+import com.looker.droidify.datastore.SettingsRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -23,8 +24,14 @@ import javax.inject.Singleton
 @Singleton
 class ExternalApi @Inject constructor(
     private val httpClient: HttpClient,
+    private val settingsRepository: SettingsRepository,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
+
+    /** The user's optional GitHub token, or null when unset. Sent only to api.github.com requests to
+     *  lift the anonymous 60-requests/hour rate limit to 5000. */
+    private suspend fun githubAuthToken(): String? =
+        settingsRepository.getInitial().githubToken.trim().takeIf { it.isNotEmpty() }
 
     suspend fun latestReleaseFor(app: ExternalApp): Release? =
         latestRelease(app.provider, app.owner, app.repo, app.includePrereleases, app.apkFilter)
@@ -38,24 +45,29 @@ class ExternalApi @Inject constructor(
      * or id can be found. Never throws.
      */
     suspend fun fetchPackageId(app: ExternalApp): String? = withContext(Dispatchers.IO) {
-        val base = when (app.provider) {
-            SourceProvider.GITHUB ->
-                "https://api.github.com/repos/${app.owner}/${app.repo}/contents"
-
-            SourceProvider.CODEBERG ->
-                "https://codeberg.org/api/v1/repos/${app.owner}/${app.repo}/contents"
-
-            SourceProvider.GITLAB -> return@withContext null
-        }
-        val github = app.provider == SourceProvider.GITHUB
+        if (app.provider == SourceProvider.GITLAB) return@withContext null
         for (path in BUILD_GRADLE_PATHS) {
-            val text = runCatching { getText("$base/$path", github = github) }.getOrNull() ?: continue
-            val source = decodeContentsBase64(text) ?: continue
+            val source = readRepoFile(app, path) ?: continue
             for (regex in PACKAGE_ID_REGEXES) {
                 regex.find(source)?.let { return@withContext it.groupValues[1] }
             }
         }
         null
+    }
+
+    /**
+     * Reads a repo text file. GitHub goes through the raw CDN, which — unlike the REST API — isn't
+     * subject to the 60-requests/hour anonymous limit, so build files / manifests / strings don't burn
+     * the budget. Gitea/Codeberg uses its contents API (base64). Null when missing or on failure.
+     */
+    private suspend fun readRepoFile(app: ExternalApp, path: String): String? = when (app.provider) {
+        SourceProvider.GITHUB -> fetchRaw(app, path)
+        SourceProvider.CODEBERG -> {
+            val url = "https://codeberg.org/api/v1/repos/${app.owner}/${app.repo}/contents/$path"
+            runCatching { getText(url) }.getOrNull()?.let { decodeContentsBase64(it) }
+        }
+
+        SourceProvider.GITLAB -> null
     }
 
     /**
@@ -171,6 +183,7 @@ class ExternalApi @Inject constructor(
                     ) {
                         header("Accept", "application/vnd.github.html")
                         header("X-GitHub-Api-Version", "2022-11-28")
+                        githubAuthToken()?.let { header("Authorization", "Bearer $it") }
                     }
                     if (response.status.isSuccess()) response.bodyAsText() else null
                 }
@@ -255,6 +268,7 @@ class ExternalApi @Inject constructor(
             if (github) {
                 header("Accept", "application/vnd.github+json")
                 header("X-GitHub-Api-Version", "2022-11-28")
+                githubAuthToken()?.let { header("Authorization", "Bearer $it") }
             }
         }
         return if (response.status.isSuccess()) response.bodyAsText() else null

@@ -248,6 +248,15 @@
     <string name="export_settings_DESC">Exporter les paramètres et favoris vers un fichier</string>
     <string name="export_repos_title">Exporter les dépôts</string>
     <string name="import_repos_DESC">Importer les dépôts à partir d\'un fichier</string>
+    <string name="import_external_title">Importer les sources externes</string>
+    <string name="import_external_DESC">Importer les sources d\'apps externes depuis un fichier</string>
+    <string name="export_external_title">Exporter les sources externes</string>
+    <string name="export_external_DESC">Exporter les sources d\'apps externes vers un fichier</string>
+    <string name="external_sources_title">Sources externes</string>
+    <string name="github_token">Jeton GitHub</string>
+    <string name="github_token_set">Configuré</string>
+    <string name="github_token_unset">Non configuré — limité à 60 requêtes/heure</string>
+    <string name="external_imported">Sources externes importées</string>
     <string name="cannot_open_link">Impossible d\'ouvrir le lien</string>
     <string name="has_tethered_network">Lié à une certaine instance de service de réseau</string>
     <string name="require_background_access">Désactiver l\'optimisation de batterie</string>

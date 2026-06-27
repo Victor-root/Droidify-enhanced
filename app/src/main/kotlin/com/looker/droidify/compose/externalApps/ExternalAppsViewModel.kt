@@ -100,6 +100,9 @@ class ExternalAppsViewModel @Inject constructor(
 
     private val downloadJobs = mutableMapOf<String, Job>()
 
+    /** When the last network refresh ran (elapsedRealtime), to throttle the per-screen-entry refresh. */
+    private var lastNetworkRefreshAt = 0L
+
     val snackbarHostState = SnackbarHostState()
 
     /** README (HTML) of the app shown on the detail screen, or null while loading / when none. */
@@ -223,8 +226,13 @@ class ExternalAppsViewModel @Inject constructor(
     }
 
     /** Re-checks every enabled app for a newer release tag (e.g. on opening the screen). Disabled
-     *  sources are skipped, like a disabled repository. */
+     *  sources are skipped, like a disabled repository. Throttled: this fires on every screen entry,
+     *  and each enabled source costs a GitHub API call, so re-checking more than once every few minutes
+     *  would needlessly burn the anonymous 60-requests/hour budget without surfacing fresher updates. */
     fun refresh() {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastNetworkRefreshAt < REFRESH_THROTTLE_MS) return
+        lastNetworkRefreshAt = now
         viewModelScope.launch {
             apps.value.filter { it.enabled }.forEach { app ->
                 val release = externalApi.latestReleaseFor(app) ?: return@forEach
@@ -519,3 +527,7 @@ private const val SPEED_WINDOW_MS = 500L
 
 /** Minimum delay between progress UI updates, to avoid flooding recompositions. */
 private const val EMIT_INTERVAL_MS = 150L
+
+/** Minimum gap between automatic network refreshes of external sources (they fire on every screen
+ *  entry and each enabled source is one GitHub API call, so this protects the rate-limit budget). */
+private const val REFRESH_THROTTLE_MS = 10 * 60 * 1000L

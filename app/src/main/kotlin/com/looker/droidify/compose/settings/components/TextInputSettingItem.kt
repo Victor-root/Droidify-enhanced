@@ -34,6 +34,9 @@ fun TextInputSettingItem(
     icon: Painter? = null,
     dialogTitle: String = title,
     enabled: Boolean = true,
+    // What to show as the subtitle. Defaults to the value itself; pass a masked/status string for
+    // secrets (e.g. a token) so the raw value isn't displayed in the settings list.
+    valueDisplay: String? = null,
 ) {
     var showDialog by remember { mutableStateOf(false) }
 
@@ -56,7 +59,7 @@ fun TextInputSettingItem(
                 },
             )
             Text(
-                text = value.ifEmpty { stringResource(R.string.unspecified) },
+                text = valueDisplay ?: value.ifEmpty { stringResource(R.string.unspecified) },
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (enabled) {
                     MaterialTheme.colorScheme.onSurfaceVariant

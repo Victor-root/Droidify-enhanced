@@ -71,6 +71,15 @@
     <string name="import_repos_DESC">Import repositories from a file</string>
     <string name="export_repos_title">Export repositories</string>
     <string name="export_repos_DESC">Export repositories to a file</string>
+    <string name="import_external_title">Import external sources</string>
+    <string name="import_external_DESC">Import external app sources from a file</string>
+    <string name="export_external_title">Export external sources</string>
+    <string name="export_external_DESC">Export external app sources to a file</string>
+    <string name="external_sources_title">External sources</string>
+    <string name="github_token">GitHub token</string>
+    <string name="github_token_set">Configured</string>
+    <string name="github_token_unset">Not set — limited to 60 requests/hour</string>
+    <string name="external_imported">External sources imported</string>
     <string name="enable_repo">Enable repository</string>
     <string name="favourites">Favourites</string>
     <string name="more_options">More</string>
