@@ -159,13 +159,18 @@ class ExternalAppsViewModel @Inject constructor(
             _readmeTranslation.value = DescriptionTranslation.Loading
             val target = java.util.Locale.getDefault().language
             val result = runCatching {
-                val plain = withContext(Dispatchers.Default) {
-                    HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_COMPACT).toString().trim()
-                }
-                translateLongText(plain, target)
+                val plain = withContext(Dispatchers.Default) { htmlToPlainText(html) }
+                // Null when there is nothing translatable (e.g. a README that is only images).
+                if (plain.isBlank()) null else translateLongText(plain, target)
             }
             _readmeTranslation.value = result.fold(
-                onSuccess = { DescriptionTranslation.Translated(summary = "", description = it) },
+                onSuccess = { translated ->
+                    if (translated == null) {
+                        DescriptionTranslation.Original
+                    } else {
+                        DescriptionTranslation.Translated(summary = "", description = translated)
+                    }
+                },
                 onFailure = { error ->
                     if (error is CancellationException) throw error
                     snack(context.getString(R.string.translation_failed))
@@ -623,6 +628,24 @@ class ExternalAppsViewModel @Inject constructor(
 enum class AddSourceState { IDLE, LOADING, SUCCESS }
 
 private val UNSAFE_FILE_CHARS = Regex("[^A-Za-z0-9._-]")
+
+/** Converts README HTML to clean plain text for translation: removes images and other non-text nodes
+ *  (so they neither become object-replacement boxes nor get translated) and tidies the whitespace. */
+private fun htmlToPlainText(html: String): String {
+    val stripped = html
+        .replace(Regex("(?is)<script\\b[^>]*>.*?</script>"), "")
+        .replace(Regex("(?is)<style\\b[^>]*>.*?</style>"), "")
+        .replace(Regex("(?is)<svg\\b[^>]*>.*?</svg>"), "")
+        .replace(Regex("(?is)<picture\\b[^>]*>.*?</picture>"), "")
+        .replace(Regex("(?i)<img\\b[^>]*>"), "")
+    val text = HtmlCompat.fromHtml(stripped, HtmlCompat.FROM_HTML_MODE_COMPACT).toString()
+    return text
+        .replace(Regex("\\uFFFC"), "")
+        .replace(Regex("[ \\t]+"), " ")
+        .replace(Regex(" *\\n *"), "\n")
+        .replace(Regex("\\n{3,}"), "\n\n")
+        .trim()
+}
 
 /** Max characters per translation request (keeps the Google endpoint's URL within limits). */
 private const val MAX_TRANSLATE_CHUNK = 1500
