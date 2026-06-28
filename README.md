@@ -1,8 +1,7 @@
 > [!WARNING]
 > **Free and Open-Source Android is under threat.**
->
-> Google plans to turn Android into a more locked-down platform, restricting your essential freedom to install the apps of your choice. Make your voice heard:
-> [**Keep Android Open**](https://keepandroidopen.org/).
+> Google plans to make Android more locked-down, restricting your freedom to install the apps of your choice.
+> Make your voice heard: [**Keep Android Open**](https://keepandroidopen.org/).
 
 <div align="center">
 
@@ -10,7 +9,7 @@
 
 ### Droidify Enhanced
 
-**A clutter-free F-Droid client — now able to install apps from anywhere, translate descriptions, and built on a modern Material You interface.**
+**A clutter-free F-Droid client, enhanced for daily use.**
 
 _Enhanced fork maintained by [Victor-root](https://github.com/Victor-root) — based on [Droid-ify](https://github.com/Droid-ify/client) by LooKeR._
 
@@ -44,172 +43,111 @@ _Enhanced fork maintained by [Victor-root](https://github.com/Victor-root) — b
 
 ## Why this fork?
 
-[Droid-ify](https://github.com/Droid-ify/client) is an excellent, clean F-Droid
-client. **Droidify Enhanced** keeps that spirit and pushes it further, with one
-goal: be a daily-driver app store that is **more capable**, **more modern**, and
-**rock-solid reliable**.
+I use Droidify every day, intensively — and over time I ran into bugs and wanted
+features that really mattered for that kind of daily use. I proposed fixes
+upstream, but many of them were built with AI assistance, and the
+[Droid-ify](https://github.com/Droid-ify/client) project has chosen to stay
+AI-free — a decision that is entirely theirs to make — so they couldn't be
+merged. Forking was the only way for me to keep improving the app at my own pace.
 
-In practice that means three things upstream doesn't do:
-
-1. **Install apps that live in no repository.** Lots of great apps are only
-   published as GitHub releases. Enhanced lets you add them as *external sources*
-   and treats them like any other app — install, update notifications and all —
-   without you ever leaving the app.
-2. **A genuinely modern interface.** The UI was rebuilt from the ground up in
-   Jetpack Compose with Material You: a Discover home, dynamic accent colours, a
-   collapsing header, smooth animations and an edge-to-edge layout.
-3. **Read any app, in your language.** A built-in translator turns an app's
-   summary and description into your device language on demand — online, on a
-   server you host, or **fully offline on-device**, your choice.
-
-On top of that, a large amount of work went into **stability, performance and
-security** (see the sections below).
+**To be clear, this is not a fork against Droid-ify.** I have deep respect for the
+original project, its author and its vision for the codebase. Droidify Enhanced
+simply serves a different need — mine — and only exists because Droid-ify gave it
+such a strong foundation.
 
 ---
 
-## ✨ What's new in Enhanced
+## ✨ Highlights
 
 ### 📦 Install apps from anywhere — *External sources*
 
-Add a code-hosting repository (e.g. a project's GitHub page) and install &
-update its app **straight from its releases**, with no F-Droid repository
-required. Enhanced does the tedious parts for you:
+Add a project's GitHub releases as a source and install & update its app with **no
+F-Droid repository required**.
 
-- **Picks the right APK automatically** for your device's CPU architecture, with
-  an optional **name filter** when a release ships several files.
-- **Falls back to an older release** when the latest one has no APK compatible
-  with your device.
-- **Shows the real app name and icon *before* installing** — read from the
-  project's manifest and resources, not just the repository name.
-- **A visual icon picker** when several icons are found in the source.
-- **Surfaces updates in the Updates tab**, with device-aware checks and clear
-  signature-conflict handling.
-- **Renders the project README** inside the app (images and links included).
-- **Editable per-source settings**: custom name, opt into pre-releases, or mute
-  a source's updates.
-- **Optional GitHub token** to lift the anonymous API rate limit — with built-in
-  help explaining how to create a **no-scope token that grants nothing on your
-  account**.
-- **Backed up** with the rest of your settings (export / import).
+- Automatically picks the right APK for your CPU architecture (with an optional
+  name filter), and falls back to an older release if the latest has none
+  compatible.
+- Shows the real app name and icon **before** installing, with a visual icon
+  picker.
+- Update notifications in the Updates tab, signature-conflict handling, and the
+  project README rendered in-app.
+- Per-source settings (custom name, pre-releases, mute), an optional no-scope
+  GitHub token to lift the API rate limit, and included in your backup.
 
-### 🎨 A modern Material You interface
+### 🎨 Modern Material You interface
 
-- Rebuilt entirely in **Jetpack Compose** with **Material 3**.
-- **Accent-colour picker**, including an option that follows your **wallpaper**
-  (real Material You colour).
-- Accent-tinted status & navigation bars, an **edge-to-edge** toggle, and a
-  header that **collapses as you scroll**.
-- Two-column card grid, animated search that slides in from the header, and
-  **wavy progress indicators** throughout.
+Rebuilt in **Jetpack Compose** with **Material 3**: an accent-colour picker
+(including a wallpaper-based option), tinted system bars, an edge-to-edge mode,
+a collapsing header, a two-column grid, animated search and wavy progress
+indicators.
 
-### 🧭 A Discover home
+### 🧭 Discover home
 
-A curated landing screen with **carousels** (what's new, recently updated, most
-downloaded) and a browsable **categories** section — so finding something new
-feels like a real store.
+A curated landing screen with carousels (what's new, recently updated, most
+downloaded) and a browsable categories section.
 
-### 🌍 Built-in description translation
+### 🌍 Built-in translation
 
-A **Translate** button in the app header renders the **summary and description**
-in your device language. Pick the engine that matches your privacy preference in
-Settings:
-
-- a fast **online** translator,
-- a **self-hostable, open-source** server you point it at,
-- or **fully on-device, offline** translation that downloads its language pack
-  only when you ask for it.
-
-An optional **auto-translate** toggle does it automatically whenever an app isn't
-already in your language. **Nothing is downloaded until you choose the on-device
-engine** — no bloat, no surprises.
+Translate an app's **summary and description** into your language, with a choice
+of **online**, **self-hosted**, or **fully offline on-device** engines. An
+optional auto-translate toggle does it for you — and nothing is downloaded until
+you pick the on-device engine.
 
 ---
 
 ## 🛡️ Security & privacy
 
-- **Signing certificate verified** against the repository index **before** an
-  install proceeds.
-- **Anti-feature warnings** and the full **runtime-permission list** are shown on
-  the app detail screen.
-- A badge **flags apps that depend on proprietary Google services**, so you know
-  before you install.
-- The optional GitHub token is **scope-less** — it only raises the API rate
-  limit and can do nothing else on your account.
-- Translation can be **100% offline** if you choose the on-device engine.
+- Signing certificate **verified against the repository index before any install**.
+- Anti-feature warnings and the full runtime-permission list on the detail screen.
+- A badge flags apps that depend on **proprietary Google services**.
+- The optional GitHub token is **scope-less** (it only lifts the rate limit), and
+  translation can run **fully offline**.
 
 ---
 
 ## 🔧 Stability & bug fixes
 
-Reliability was a first-class goal. Highlights:
-
 **Performance**
-- Unified the whole data layer on a single **Room** database and removed the
-  legacy SQLite database, sync service, downloader and index parser.
-- Moved list and screen-state work **off the main thread** and stopped redundant
-  state emissions.
-- Added a **baseline profile** for faster cold starts and smoother first scroll.
-- Fixed a **freeze (ANR)** on the app detail screen.
+- Unified the data layer on a single **Room** database, removing the legacy
+  SQLite store, sync service, downloader and index parser.
+- Moved list and screen-state work **off the main thread**, added a **baseline
+  profile** for faster cold starts, and fixed a **freeze (ANR)** on the detail
+  screen.
 
-**Large catalogues**
-- Oversized repository rows no longer exceed the SQLite cursor-window limit
-  (which could previously crash the list).
-- APK validation now runs off the main thread.
-
-**Sync**
-- Automatic **re-sync after a database reset**.
-- Fixed a case where a sync could silently finish with an **empty catalogue**.
-- The index is downloaded to a **fresh file** each time.
-- A clear **fetching state on first launch**, and the UI stays responsive while
-  that first (large) sync runs.
-- The foreground sync notification is **throttled** so it no longer flickers.
+**Large catalogues & sync**
+- Oversized repository rows no longer exceed the SQLite cursor-window limit that
+  could crash the list.
+- Reliable sync: auto re-sync after a database reset, no more silent
+  empty-catalogue syncs, a fresh index file each time, and a clear fetching state
+  on first launch. The foreground notification is throttled so it no longer
+  flickers.
 
 **Updates & installs**
-- System-app updates that **can't be installed** are hidden.
-- Stopped the repeated **uninstall-prompt loop** for system apps signed with a
-  different key.
-- A downloaded APK is **reused** after uninstalling a signature-conflicting
-  version — no needless re-download.
-
----
-
-## 🌐 Language
-
-Enhanced ships a complete, **formal French** translation in addition to English,
-and inherits the other languages from upstream. Contributions for more languages
-are welcome.
+- Hides system-app updates that can't be installed and stops the uninstall-prompt
+  loop for differently-signed system apps.
+- Reuses an already-downloaded APK after a signature-conflict uninstall — no
+  needless re-download.
 
 ---
 
 ## 🚀 Get started
 
-**Download:** grab the latest APK from
+**Download:** the latest APK from
 [**GitHub Releases**](https://github.com/Victor-root/Droidify-enhanced/releases/latest).
-
 **Build from source:** see the [Building Guide](docs/building.md).
 
-> Requires Android 6.0 (API 23) or newer.
+> Requires Android 6.0 (API 23) or newer. Ships in English and full (formal)
+> French, with the other languages inherited from upstream.
 
 ---
 
 ## 🙏 Built on the shoulders of giants
 
-Droidify Enhanced exists thanks to the work that came before it:
+- **[Droid-ify](https://github.com/Droid-ify/client)** by **LooKeR** — the base this fork builds on.
+- **[Foxy-Droid](https://github.com/kitsunyan/foxy-droid)** by **kitsunyan** — the client Droid-ify itself grew from.
 
-- **[Droid-ify](https://github.com/Droid-ify/client)** by **LooKeR** — the base
-  this fork builds on.
-- **[Foxy-Droid](https://github.com/kitsunyan/foxy-droid)** by **kitsunyan** —
-  the original client Droid-ify itself grew from.
-
-Huge thanks to both projects and their contributors.
-
----
-
-## 🤝 Contributing
-
-Issues and pull requests are welcome. If you're setting up a dev environment,
-start with the [Building Guide](docs/building.md) and the
-[Contributing Guide](CONTRIBUTING.md).
+Huge thanks to both projects and their contributors. Contributions here are
+welcome too — start with the [Contributing Guide](CONTRIBUTING.md).
 
 ---
 
