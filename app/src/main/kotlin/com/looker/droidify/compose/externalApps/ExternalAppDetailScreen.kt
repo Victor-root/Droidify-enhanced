@@ -125,7 +125,11 @@ fun ExternalAppDetailScreen(
         // Show the translated HTML when present, otherwise the original. Both render in the WebView so a
         // translation keeps the README's images, headings, lists and links.
         val readmeHtml = (readmeTranslation as? DescriptionTranslation.Translated)?.description ?: readme
-        var readmeHeightPx by remember(readmeHtml) { mutableStateOf(0) }
+        // Keyed on app.key (stable for this screen), NOT on the html: the WebView captures its
+        // height callback once, so the callback must keep targeting the same state instance. The
+        // WebView re-reports its height every time the document reloads, so translating or reverting
+        // resizes correctly on its own.
+        var readmeHeightPx by remember(app.key) { mutableStateOf(0) }
         Column(
             modifier = Modifier
                 .fillMaxSize()
