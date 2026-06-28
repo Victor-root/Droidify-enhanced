@@ -11,7 +11,7 @@
 
 **A clutter-free F-Droid client, enhanced for daily use.**
 
-_Enhanced fork maintained by [Victor-root](https://github.com/Victor-root) — based on [Droid-ify](https://github.com/Droid-ify/client) by LooKeR._
+_Enhanced fork maintained by [Victor-root](https://github.com/Victor-root), based on [Droid-ify](https://github.com/Droid-ify/client) by LooKeR._
 
 [![Latest release](https://img.shields.io/github/v/release/Victor-root/Droidify-enhanced?display_name=tag&color=%23d97706&style=for-the-badge)](https://github.com/Victor-root/Droidify-enhanced/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Victor-root/Droidify-enhanced/total.svg?color=%236f9645&style=for-the-badge)](https://github.com/Victor-root/Droidify-enhanced/releases/)
@@ -43,23 +43,23 @@ _Enhanced fork maintained by [Victor-root](https://github.com/Victor-root) — b
 
 ## Why this fork?
 
-I use Droidify every day, intensively — and over time I ran into bugs and wanted
+I use Droidify every day, intensively, and over time I ran into bugs and wanted
 features that really mattered for that kind of daily use. I proposed fixes
 upstream, but many of them were built with AI assistance, and the
 [Droid-ify](https://github.com/Droid-ify/client) project has chosen to stay
-AI-free — a decision that is entirely theirs to make — so they couldn't be
+AI-free. That is entirely their decision to make, so those fixes couldn't be
 merged. Forking was the only way for me to keep improving the app at my own pace.
 
 **To be clear, this is not a fork against Droid-ify.** I have deep respect for the
 original project, its author and its vision for the codebase. Droidify Enhanced
-simply serves a different need — mine — and only exists because Droid-ify gave it
+simply serves a different need, my own, and only exists because Droid-ify gave it
 such a strong foundation.
 
 ---
 
 ## ✨ Highlights
 
-### 📦 Install apps from anywhere — *External sources*
+### 📦 Install apps from anywhere (*External sources*)
 
 Add a project's GitHub releases as a source and install & update its app with **no
 F-Droid repository required**.
@@ -90,7 +90,7 @@ downloaded) and a browsable categories section.
 
 Translate an app's **summary and description** into your language, with a choice
 of **online**, **self-hosted**, or **fully offline on-device** engines. An
-optional auto-translate toggle does it for you — and nothing is downloaded until
+optional auto-translate toggle does it for you, and nothing is downloaded until
 you pick the on-device engine.
 
 ---
@@ -125,7 +125,7 @@ you pick the on-device engine.
 **Updates & installs**
 - Hides system-app updates that can't be installed and stops the uninstall-prompt
   loop for differently-signed system apps.
-- Reuses an already-downloaded APK after a signature-conflict uninstall — no
+- Reuses an already-downloaded APK after a signature-conflict uninstall, with no
   needless re-download.
 
 ---
@@ -143,18 +143,18 @@ you pick the on-device engine.
 
 ## 🙏 Built on the shoulders of giants
 
-- **[Droid-ify](https://github.com/Droid-ify/client)** by **LooKeR** — the base this fork builds on.
-- **[Foxy-Droid](https://github.com/kitsunyan/foxy-droid)** by **kitsunyan** — the client Droid-ify itself grew from.
+- **[Droid-ify](https://github.com/Droid-ify/client)** by **LooKeR**: the base this fork builds on.
+- **[Foxy-Droid](https://github.com/kitsunyan/foxy-droid)** by **kitsunyan**: the client Droid-ify itself grew from.
 
 Huge thanks to both projects and their contributors. Contributions here are
-welcome too — start with the [Contributing Guide](CONTRIBUTING.md).
+welcome too. Start with the [Contributing Guide](CONTRIBUTING.md).
 
 ---
 
 ## 📄 License
 
 ```
-Droidify Enhanced — a fork of Droid-ify
+Droidify Enhanced, a fork of Droid-ify
 
 Copyright (C) 2025 LooKeR (original Droid-ify)
 Copyright (C) 2026 Victor-root (Droidify Enhanced fork)
