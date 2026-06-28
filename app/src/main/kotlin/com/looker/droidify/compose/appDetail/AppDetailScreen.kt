@@ -110,11 +110,25 @@ fun AppDetailScreen(
     val isFavourite by viewModel.isFavourite.collectAsStateWithLifecycle()
     val installedInfo by viewModel.installedInfo.collectAsStateWithLifecycle()
     val descriptionTranslation by viewModel.descriptionTranslation.collectAsStateWithLifecycle()
+    val successState = state as? AppDetailState.Success
+    // The what's-new shown is the device-suitable release's text (falling back to the first package).
+    // Translate the same text so the toggle covers the whole description area, not just summary + body.
+    val suggestedWhatsNew = remember(successState) {
+        successState?.let { s ->
+            (
+                s.packages.selectForDevice(s.app.metadata.suggestedVersionCode)?.first
+                    ?: s.packages.firstOrNull()?.first
+            )?.whatsNew
+        }.orEmpty()
+    }
     // Auto-translate on open when the setting is on (the ViewModel decides if it's actually needed).
-    val autoTranslateApp = (state as? AppDetailState.Success)?.app
-    LaunchedEffect(autoTranslateApp?.metadata?.packageName?.name) {
-        autoTranslateApp?.let {
-            viewModel.maybeAutoTranslate(it.metadata.summary, it.metadata.description.raw)
+    LaunchedEffect(successState?.app?.metadata?.packageName?.name) {
+        successState?.app?.let {
+            viewModel.maybeAutoTranslate(
+                it.metadata.summary,
+                it.metadata.description.raw,
+                suggestedWhatsNew,
+            )
         }
     }
     val uriHandler = LocalUriHandler.current
@@ -184,14 +198,17 @@ fun AppDetailScreen(
                 },
                 navigationIcon = { BackButton(onBackClick) },
                 actions = {
-                    val successApp = (state as? AppDetailState.Success)?.app
-                    if (successApp != null && successApp.metadata.description.isNotBlank()) {
+                    val successApp = successState?.app
+                    if (successApp != null &&
+                        (successApp.metadata.description.isNotBlank() || suggestedWhatsNew.isNotBlank())
+                    ) {
                         TranslateAction(
                             translation = descriptionTranslation,
                             onTranslate = {
                                 viewModel.translateDescription(
                                     successApp.metadata.summary,
                                     successApp.metadata.description.raw,
+                                    suggestedWhatsNew,
                                 )
                             },
                             onShowOriginal = viewModel::showOriginalDescription,
@@ -460,7 +477,9 @@ private fun AppDetail(
 
         suggestedPackage?.whatsNew?.takeIf { it.isNotBlank() }?.let { whatsNew ->
             Spacer(modifier = Modifier.height(16.dp))
-            WhatsNewSection(whatsNew = whatsNew)
+            val translatedWhatsNew = (descriptionTranslation as? DescriptionTranslation.Translated)
+                ?.whatsNew?.takeIf { it.isNotBlank() }
+            WhatsNewSection(whatsNew = translatedWhatsNew ?: whatsNew)
         }
 
         if (app.hasLinks()) {

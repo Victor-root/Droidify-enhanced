@@ -76,16 +76,16 @@ class AppDetailViewModel @Inject constructor(
         MutableStateFlow<DescriptionTranslation>(DescriptionTranslation.Original)
     val descriptionTranslation: StateFlow<DescriptionTranslation> = _descriptionTranslation
 
-    /** Translates the summary + description (HTML) into the device language. Never throws. */
-    fun translateDescription(summary: String, descriptionHtml: String) {
-        if (summary.isBlank() && descriptionHtml.isBlank()) return
-        viewModelScope.launch { translateBoth(summary, descriptionHtml, notifyError = true) }
+    /** Translates the summary + description (HTML) + what's-new into the device language. Never throws. */
+    fun translateDescription(summary: String, descriptionHtml: String, whatsNew: String) {
+        if (summary.isBlank() && descriptionHtml.isBlank() && whatsNew.isBlank()) return
+        viewModelScope.launch { translateBoth(summary, descriptionHtml, whatsNew, notifyError = true) }
     }
 
     /** When the auto-translate setting is on, translates on screen entry — but only if the description
      *  is actually in another language (detected on-device), so a description already in the user's
      *  language is left alone. */
-    fun maybeAutoTranslate(summary: String, descriptionHtml: String) {
+    fun maybeAutoTranslate(summary: String, descriptionHtml: String, whatsNew: String) {
         if (_descriptionTranslation.value != DescriptionTranslation.Original) return
         if (descriptionHtml.isBlank()) return
         viewModelScope.launch {
@@ -95,7 +95,7 @@ class AppDetailViewModel @Inject constructor(
                 translationManager.detectLanguage(plainText(descriptionHtml))
             }.getOrNull()
             if (detected != null && detected != "und" && detected != target) {
-                translateBoth(summary, descriptionHtml, notifyError = false)
+                translateBoth(summary, descriptionHtml, whatsNew, notifyError = false)
             }
         }
     }
@@ -103,6 +103,7 @@ class AppDetailViewModel @Inject constructor(
     private suspend fun translateBoth(
         summary: String,
         descriptionHtml: String,
+        whatsNew: String,
         notifyError: Boolean,
     ) {
         _descriptionTranslation.value = DescriptionTranslation.Loading
@@ -116,9 +117,13 @@ class AppDetailViewModel @Inject constructor(
                 val translatedDescription = async {
                     if (description.isBlank()) "" else translationManager.translate(description, target)
                 }
+                val translatedWhatsNew = async {
+                    if (whatsNew.isBlank()) "" else translationManager.translate(whatsNew, target)
+                }
                 DescriptionTranslation.Translated(
                     summary = translatedSummary.await(),
                     description = translatedDescription.await(),
+                    whatsNew = translatedWhatsNew.await(),
                 )
             }
         }

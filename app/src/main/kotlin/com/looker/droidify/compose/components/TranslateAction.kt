@@ -27,8 +27,12 @@ sealed interface DescriptionTranslation {
     /** Translation in progress (covers the first-use ML Kit model download too). */
     data object Loading : DescriptionTranslation
 
-    /** Showing the translated summary + description. */
-    data class Translated(val summary: String, val description: String) : DescriptionTranslation
+    /** Showing the translated summary + description, plus the what's-new text when there is one. */
+    data class Translated(
+        val summary: String,
+        val description: String,
+        val whatsNew: String = "",
+    ) : DescriptionTranslation
 
     /** The translation couldn't be produced (offline, bad config, unsupported language…). */
     data object Failed : DescriptionTranslation
