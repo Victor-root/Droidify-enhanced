@@ -26,19 +26,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -76,8 +73,10 @@ import com.looker.droidify.R
 import com.looker.droidify.compose.appDetail.components.CustomButtonsRow
 import com.looker.droidify.compose.appDetail.components.PackageItem
 import com.looker.droidify.compose.components.BackButton
+import com.looker.droidify.compose.components.DescriptionTranslation
 import com.looker.droidify.compose.components.DownloadProgressRow
 import com.looker.droidify.compose.components.InstallingRow
+import com.looker.droidify.compose.components.TranslateAction
 import com.looker.droidify.data.model.App
 import com.looker.droidify.data.model.FilePath
 import com.looker.droidify.data.model.Package
@@ -300,51 +299,6 @@ private fun PrimaryActions(
                     Text(stringResource(R.string.uninstall))
                 }
             }
-        }
-    }
-}
-
-/**
- * The top-bar Translate toggle: tap to translate the summary + description into the device language,
- * tap again to revert to the original. While translating, the icon is ringed by the app's wavy
- * progress indicator (in the bar's colour). Nothing is fetched or downloaded until the user taps.
- */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun TranslateAction(
-    translation: DescriptionTranslation,
-    onTranslate: () -> Unit,
-    onShowOriginal: () -> Unit,
-) {
-    when (translation) {
-        DescriptionTranslation.Loading -> Box(
-            modifier = Modifier.size(48.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            CircularWavyProgressIndicator(
-                modifier = Modifier.size(36.dp),
-                color = LocalContentColor.current,
-            )
-            Icon(
-                imageVector = Icons.Filled.Translate,
-                contentDescription = stringResource(R.string.translating),
-                modifier = Modifier.size(18.dp),
-            )
-        }
-
-        is DescriptionTranslation.Translated -> IconButton(onClick = onShowOriginal) {
-            Icon(
-                imageVector = Icons.Filled.Translate,
-                contentDescription = stringResource(R.string.show_original),
-            )
-        }
-
-        // Original or Failed: tapping (re)translates.
-        else -> IconButton(onClick = onTranslate) {
-            Icon(
-                imageVector = Icons.Filled.Translate,
-                contentDescription = stringResource(R.string.translate),
-            )
         }
     }
 }

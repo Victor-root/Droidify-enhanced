@@ -44,6 +44,8 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.looker.droidify.R
 import com.looker.droidify.compose.components.BackButton
+import com.looker.droidify.compose.components.DescriptionTranslation
+import com.looker.droidify.compose.components.TranslateAction
 import com.looker.droidify.compose.theme.AccentBarHeight
 import com.looker.droidify.compose.theme.accentTopAppBarColors
 import com.looker.droidify.external.apkVersionLabel
@@ -61,6 +63,7 @@ fun ExternalAppDetailScreen(
     val installedKeys by viewModel.installedKeys.collectAsStateWithLifecycle()
     val installedVersions by viewModel.installedVersions.collectAsStateWithLifecycle()
     val readme by viewModel.readme.collectAsStateWithLifecycle()
+    val readmeTranslation by viewModel.readmeTranslation.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.refresh()
@@ -96,6 +99,16 @@ fun ExternalAppDetailScreen(
                     )
                 },
                 navigationIcon = { BackButton(onBackClick) },
+                actions = {
+                    // Only offer translation once there's a README to translate.
+                    if (readme != null) {
+                        TranslateAction(
+                            translation = readmeTranslation,
+                            onTranslate = { readme?.let(viewModel::translateReadme) },
+                            onShowOriginal = viewModel::showOriginalReadme,
+                        )
+                    }
+                },
             )
         },
         snackbarHost = { SnackbarHost(viewModel.snackbarHostState) },
@@ -196,7 +209,18 @@ fun ExternalAppDetailScreen(
             // GitHub leaves repo-relative image paths un-rewritten, so the WebView resolves them
             // against the raw content host. While it loads, show a spinner instead of empty space.
             val currentReadme = readme
-            if (currentReadme != null) {
+            val translatedReadme = readmeTranslation as? DescriptionTranslation.Translated
+            if (translatedReadme != null) {
+                // Translated README, shown as plain text. The header's Translate toggle reverts to the
+                // original rendered README.
+                Text(
+                    text = translatedReadme.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                )
+            } else if (currentReadme != null) {
                 ReadmeWebView(
                     html = currentReadme,
                     baseUrl = "https://raw.githubusercontent.com/${app.owner}/${app.repo}/HEAD/",

@@ -17,6 +17,7 @@ import com.looker.droidify.R
 import com.looker.droidify.data.AppRepository
 import com.looker.droidify.data.RepoRepository
 import com.looker.droidify.data.model.App
+import com.looker.droidify.compose.components.DescriptionTranslation
 import com.looker.droidify.data.model.Package
 import com.looker.droidify.data.model.PackageName
 import com.looker.droidify.data.model.Repo
@@ -56,21 +57,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.security.MessageDigest
 import javax.inject.Inject
-
-/** UI state of the description "Translate" toggle on the app detail screen. */
-sealed interface DescriptionTranslation {
-    /** Showing the original description. */
-    data object Original : DescriptionTranslation
-
-    /** Translation in progress (covers the first-use ML Kit model download too). */
-    data object Loading : DescriptionTranslation
-
-    /** Showing the translated summary + description. */
-    data class Translated(val summary: String, val description: String) : DescriptionTranslation
-
-    /** The translation couldn't be produced (offline, bad config, unsupported language…). */
-    data object Failed : DescriptionTranslation
-}
 
 @HiltViewModel
 class AppDetailViewModel @Inject constructor(

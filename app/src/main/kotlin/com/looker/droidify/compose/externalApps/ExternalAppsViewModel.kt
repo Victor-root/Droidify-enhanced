@@ -7,10 +7,12 @@ import android.os.SystemClock
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.core.graphics.drawable.toBitmap
+import androidx.core.text.HtmlCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.looker.droidify.R
 import com.looker.droidify.compose.appDetail.DownloadStatus
+import com.looker.droidify.compose.components.DescriptionTranslation
 import com.looker.droidify.data.model.PackageName
 import com.looker.droidify.external.ExternalApi
 import com.looker.droidify.external.ExternalApp
@@ -24,6 +26,7 @@ import com.looker.droidify.installer.model.InstallItem
 import com.looker.droidify.installer.model.InstallState
 import com.looker.droidify.network.Downloader
 import com.looker.droidify.network.NetworkResponse
+import com.looker.droidify.translation.TranslationManager
 import com.looker.droidify.utility.common.cache.Cache
 import com.looker.droidify.utility.common.extension.asStateFlow
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -46,6 +49,7 @@ class ExternalAppsViewModel @Inject constructor(
     private val repository: ExternalAppRepository,
     private val downloader: Downloader,
     private val installManager: InstallManager,
+    private val translationManager: TranslationManager,
     @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -126,7 +130,14 @@ class ExternalAppsViewModel @Inject constructor(
     private val _readme = MutableStateFlow<String?>(null)
     val readme: StateFlow<String?> = _readme
 
+    /** State of the README "Translate" toggle on the external detail screen. */
+    private val _readmeTranslation =
+        MutableStateFlow<DescriptionTranslation>(DescriptionTranslation.Original)
+    val readmeTranslation: StateFlow<DescriptionTranslation> = _readmeTranslation
+
     fun loadReadme(app: ExternalApp) {
+        // A different app's README is about to load, so drop any translation left on the previous one.
+        _readmeTranslation.value = DescriptionTranslation.Original
         viewModelScope.launch {
             // Show the cached README instantly (if any) so a re-open isn't blocked on the network,
             // then refresh in the background and update the disk cache.
@@ -136,6 +147,46 @@ class ExternalAppsViewModel @Inject constructor(
             if (fresh != null) {
                 _readme.value = fresh
                 withContext(Dispatchers.IO) { ReadmeCache.save(context, app.key, fresh) }
+            }
+        }
+    }
+
+    /** Translates the README's plain text into the device language. Never throws: on failure it shows a
+     *  snackbar and leaves the toggle in the "failed" state (tapping again retries). */
+    fun translateReadme(html: String) {
+        if (html.isBlank()) return
+        viewModelScope.launch {
+            _readmeTranslation.value = DescriptionTranslation.Loading
+            val target = java.util.Locale.getDefault().language
+            val result = runCatching {
+                val plain = withContext(Dispatchers.Default) {
+                    HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_COMPACT).toString().trim()
+                }
+                translateLongText(plain, target)
+            }
+            _readmeTranslation.value = result.fold(
+                onSuccess = { DescriptionTranslation.Translated(summary = "", description = it) },
+                onFailure = { error ->
+                    if (error is CancellationException) throw error
+                    snack(context.getString(R.string.translation_failed))
+                    DescriptionTranslation.Failed
+                },
+            )
+        }
+    }
+
+    fun showOriginalReadme() {
+        _readmeTranslation.value = DescriptionTranslation.Original
+    }
+
+    /** Translates long text by splitting it into chunks first, so a big README stays under each
+     *  engine's per-request limits (the Google endpoint in particular sends the text in the URL). */
+    private suspend fun translateLongText(text: String, target: String): String {
+        if (text.length <= MAX_TRANSLATE_CHUNK) return translationManager.translate(text, target)
+        return buildString {
+            chunkText(text, MAX_TRANSLATE_CHUNK).forEachIndexed { index, chunk ->
+                if (index > 0) append('\n')
+                append(translationManager.translate(chunk, target))
             }
         }
     }
@@ -572,6 +623,47 @@ class ExternalAppsViewModel @Inject constructor(
 enum class AddSourceState { IDLE, LOADING, SUCCESS }
 
 private val UNSAFE_FILE_CHARS = Regex("[^A-Za-z0-9._-]")
+
+/** Max characters per translation request (keeps the Google endpoint's URL within limits). */
+private const val MAX_TRANSLATE_CHUNK = 1500
+
+/** Splits [text] into chunks of at most [max] characters, breaking on line boundaries where possible
+ *  (and hard-splitting any single line longer than [max]) so each translation request stays bounded. */
+private fun chunkText(text: String, max: Int): List<String> {
+    val chunks = mutableListOf<String>()
+    val current = StringBuilder()
+    fun flush() {
+        if (current.isNotEmpty()) {
+            chunks += current.toString()
+            current.clear()
+        }
+    }
+    for (line in text.split('\n')) {
+        when {
+            line.length > max -> {
+                flush()
+                var start = 0
+                while (start < line.length) {
+                    val end = minOf(start + max, line.length)
+                    chunks += line.substring(start, end)
+                    start = end
+                }
+            }
+
+            current.isNotEmpty() && current.length + 1 + line.length > max -> {
+                flush()
+                current.append(line)
+            }
+
+            else -> {
+                if (current.isNotEmpty()) current.append('\n')
+                current.append(line)
+            }
+        }
+    }
+    flush()
+    return chunks
+}
 
 /** How often the download speed is recomputed (sliding window length). */
 private const val SPEED_WINDOW_MS = 500L
