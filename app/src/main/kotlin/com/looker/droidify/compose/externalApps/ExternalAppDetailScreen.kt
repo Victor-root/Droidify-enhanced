@@ -122,7 +122,10 @@ fun ExternalAppDetailScreen(
         // top bar stays fixed. The WebView reports its content height (below) so it can be sized
         // exactly instead of owning a second, separate scroll.
         val density = LocalDensity.current
-        var readmeHeightPx by remember(app.key) { mutableStateOf(0) }
+        // Show the translated HTML when present, otherwise the original. Both render in the WebView so a
+        // translation keeps the README's images, headings, lists and links.
+        val readmeHtml = (readmeTranslation as? DescriptionTranslation.Translated)?.description ?: readme
+        var readmeHeightPx by remember(readmeHtml) { mutableStateOf(0) }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -208,21 +211,9 @@ fun ExternalAppDetailScreen(
             // README — sized to its content (it doesn't scroll itself) so it scrolls with the rest.
             // GitHub leaves repo-relative image paths un-rewritten, so the WebView resolves them
             // against the raw content host. While it loads, show a spinner instead of empty space.
-            val currentReadme = readme
-            val translatedReadme = readmeTranslation as? DescriptionTranslation.Translated
-            if (translatedReadme != null) {
-                // Translated README, shown as plain text. The header's Translate toggle reverts to the
-                // original rendered README.
-                Text(
-                    text = translatedReadme.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                )
-            } else if (currentReadme != null) {
+            if (readmeHtml != null) {
                 ReadmeWebView(
-                    html = currentReadme,
+                    html = readmeHtml,
                     baseUrl = "https://raw.githubusercontent.com/${app.owner}/${app.repo}/HEAD/",
                     onContentHeight = { readmeHeightPx = it },
                     modifier = Modifier
