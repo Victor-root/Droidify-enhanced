@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -38,9 +38,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -68,16 +65,12 @@ fun DiscoverCarousel(
     modifier: Modifier = Modifier,
     expanded: Boolean = false,
 ) {
-    // D-pad: pressing "down" on the section header lands on the first (leftmost) tile rather than the
-    // geometrically nearest (middle) one. Only matters for a remote; a no-op with touch.
-    val firstTile = remember { FocusRequester() }
     Column(verticalArrangement = spacedBy(10.dp), modifier = modifier) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier
                 .fillMaxWidth()
-                .focusProperties { down = firstTile }
                 // TV only: focus ring around the section header (no-op on touch).
                 .tvFocusOutline(RoundedCornerShape(12.dp))
                 .clickable(onClick = onSeeAll)
@@ -112,17 +105,12 @@ fun DiscoverCarousel(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = spacedBy(16.dp),
         ) {
-            itemsIndexed(apps, key = { _, app -> app.appId }) { index, app ->
+            items(apps, key = { it.appId }) { app ->
                 CatalogAppTile(
                     app = app,
                     isInstalled = app.packageName.name in installedPackages,
                     onClick = { onAppClick(app.packageName.name) },
-                    modifier = Modifier
-                        .width(80.dp)
-                        .then(
-                            // The header's "down" is redirected here (the leftmost tile).
-                            if (index == 0) Modifier.focusRequester(firstTile) else Modifier,
-                        ),
+                    modifier = Modifier.width(80.dp),
                 )
             }
         }
