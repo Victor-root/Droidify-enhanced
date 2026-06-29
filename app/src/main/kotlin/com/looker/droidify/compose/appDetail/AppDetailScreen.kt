@@ -87,6 +87,7 @@ import com.looker.droidify.compose.components.InstallingRow
 import com.looker.droidify.compose.components.TranslateAction
 import com.looker.droidify.compose.components.tvFocusFill
 import com.looker.droidify.compose.components.tvFocusOutline
+import com.looker.droidify.compose.components.tvFocusScale
 import com.looker.droidify.compose.components.tvFocusScaleOutline
 import com.looker.droidify.compose.theme.LocalIsTelevision
 import com.looker.droidify.data.model.App
@@ -304,9 +305,11 @@ private fun PrimaryActions(
     modifier: Modifier = Modifier,
 ) {
     val installing = installState == InstallState.Pending || installState == InstallState.Installing
-    // TV focus for the action buttons: the button scales up and shows a ring matching its pill shape. A
-    // ring alone was too easy to miss on the big filled Install button, so it scales too; the filled
-    // buttons are accent-coloured, so the ring uses the contrasting onPrimary colour to stay visible.
+    val isTelevision = LocalIsTelevision.current
+    // TV focus for the action buttons: the button scales up and shows a contrasting ring. On TV the
+    // buttons are sized to their content and centred (not stretched full-width) so the focus zoom stays
+    // on screen instead of overflowing the edges; touch keeps the full-width buttons. The filled buttons
+    // are accent-coloured, so the ring uses the contrasting onPrimary colour to stay visible.
     val filledButtonShape = RoundedCornerShape(50)
     val filledButtonFocus = MaterialTheme.colorScheme.onPrimary
     when {
@@ -323,22 +326,27 @@ private fun PrimaryActions(
 
         else -> Row(
             modifier = modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(
+                8.dp,
+                if (isTelevision) Alignment.CenterHorizontally else Alignment.Start,
+            ),
         ) {
+            // Full-width on touch (weight), content-sized on TV so the focus zoom doesn't run off-screen.
+            val primaryButtonModifier = if (isTelevision) Modifier else Modifier.weight(1f)
             when {
                 !isInstalled -> Button(
                     onClick = onInstallOrUpdate,
-                    modifier = Modifier.weight(1f).tvFocusScaleOutline(filledButtonShape, filledButtonFocus),
+                    modifier = primaryButtonModifier.tvFocusScaleOutline(filledButtonShape, filledButtonFocus),
                 ) { Text(stringResource(R.string.install)) }
 
                 updateAvailable -> Button(
                     onClick = onInstallOrUpdate,
-                    modifier = Modifier.weight(1f).tvFocusScaleOutline(filledButtonShape, filledButtonFocus),
+                    modifier = primaryButtonModifier.tvFocusScaleOutline(filledButtonShape, filledButtonFocus),
                 ) { Text(stringResource(R.string.update)) }
 
                 else -> Button(
                     onClick = onLaunch,
-                    modifier = Modifier.weight(1f).tvFocusScaleOutline(filledButtonShape, filledButtonFocus),
+                    modifier = primaryButtonModifier.tvFocusScaleOutline(filledButtonShape, filledButtonFocus),
                 ) { Text(stringResource(R.string.launch)) }
             }
             if (isInstalled) {
@@ -1055,8 +1063,9 @@ private fun CategoriesRow(categories: List<String>) {
                 onClick = { },
                 enabled = true,
                 label = { Text(cat) },
-                // TV: scale + ring so it's clear which tag is focused. No-op on touch.
-                modifier = Modifier.tvFocusScaleOutline(RoundedCornerShape(8.dp)),
+                // TV: the chip simply scales up on focus. A drawn ring sat off the chip's own outline
+                // (the layout bounds are larger than the visible pill), so scale alone reads cleaner.
+                modifier = Modifier.tvFocusScale(),
             )
         }
     }
