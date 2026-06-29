@@ -1,15 +1,18 @@
 package com.looker.droidify.compose.components
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,6 +30,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.looker.droidify.compose.theme.LocalIsTelevision
+import kotlinx.coroutines.launch
 
 /**
  * Android TV only: the focused element scales up and is lifted above its neighbours. Draw-only
@@ -65,6 +69,35 @@ fun Modifier.tvReadable(): Modifier {
         .clip(shape)
         .onFocusChanged { focused = it.isFocused }
         .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha), shape)
+        .focusable()
+}
+
+/**
+ * Android TV only: makes a tall, non-interactive block (e.g. a README rendered in a WebView) a single
+ * D-pad focus stop that pages the surrounding [scrollState] up/down by [stepPx] instead of stepping
+ * through the links and images inside it. "Down" pages down until the page bottom, then releases focus;
+ * "up" pages up until the page top, then releases (so focus can return to the controls above). A no-op
+ * on touch. The block itself should be made non-focusable internally (e.g. a non-focusable WebView) so
+ * focus lands here, not on its contents.
+ */
+@Composable
+fun Modifier.tvPageScroll(scrollState: ScrollState, stepPx: Int): Modifier {
+    if (!LocalIsTelevision.current) return this
+    val scope = rememberCoroutineScope()
+    return this
+        .onPreviewKeyEvent { event ->
+            if (event.type != KeyEventType.KeyDown || stepPx <= 0) {
+                false
+            } else if (event.key == Key.DirectionDown && scrollState.value < scrollState.maxValue) {
+                scope.launch { scrollState.animateScrollBy(stepPx.toFloat()) }
+                true
+            } else if (event.key == Key.DirectionUp && scrollState.value > 0) {
+                scope.launch { scrollState.animateScrollBy(-stepPx.toFloat()) }
+                true
+            } else {
+                false
+            }
+        }
         .focusable()
 }
 
