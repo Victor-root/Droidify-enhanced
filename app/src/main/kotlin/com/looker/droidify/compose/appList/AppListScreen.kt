@@ -134,6 +134,7 @@ import com.looker.droidify.compose.theme.LocalIsTelevision
 import com.looker.droidify.compose.theme.LocalOnAccentBarColor
 import com.looker.droidify.compose.theme.LocalStatusBarScrimAlpha
 import com.looker.droidify.compose.theme.accentTopAppBarColors
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.roundToInt
 
@@ -299,6 +300,24 @@ fun AppListScreen(
     // collapse-on-scroll is only wired up off TV. Other edge-to-edge behaviour is left untouched.
     val collapsibleHeader = edgeToEdge && !isTelevision
 
+    // Android TV must always have a focused element on screen: if a remote key is pressed while nothing
+    // holds focus, input dispatch times out and the system kills the app (an ANR, "does not have a
+    // focused window"). The tab row is present from the very first frame (even during the initial sync),
+    // so it's the natural startup landing point. We retry briefly because the requester isn't attached
+    // until the header is laid out. This only sets where focus *starts*; it redirects no navigation, and
+    // is a no-op on touch.
+    val tabsFocusRequester = remember { FocusRequester() }
+    if (isTelevision) {
+        LaunchedEffect(Unit) {
+            repeat(20) {
+                if (runCatching { tabsFocusRequester.requestFocus() }.getOrDefault(false)) {
+                    return@LaunchedEffect
+                }
+                delay(50)
+            }
+        }
+    }
+
     Scaffold(
         // Edge-to-edge: let the header collapse as the grid scrolls. Pinned otherwise (and on TV).
         modifier = if (collapsibleHeader) {
@@ -367,6 +386,15 @@ fun AppListScreen(
                         selectedTab = selectedTab,
                         updatesCount = updatesCount + externalUpdates.size,
                         onSelectTab = viewModel::selectTab,
+                        // TV: the tab row is the startup focus target (see tabsFocusRequester). As a
+                        // focus group, requesting focus here lands on a tab. No effect on touch.
+                        modifier = if (isTelevision) {
+                            Modifier
+                                .focusRequester(tabsFocusRequester)
+                                .focusGroup()
+                        } else {
+                            Modifier
+                        },
                     )
                     // While the full-screen fetching state is up, the thin banner is redundant.
                     if (isSyncing && !catalogLoading) {
@@ -613,8 +641,10 @@ private fun AppTabRow(
     selectedTab: AppTab,
     updatesCount: Int,
     onSelectTab: (AppTab) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     TabRow(
+        modifier = modifier,
         selectedTabIndex = selectedTab.ordinal,
         containerColor = LocalAccentBarColor.current,
         contentColor = LocalOnAccentBarColor.current,
