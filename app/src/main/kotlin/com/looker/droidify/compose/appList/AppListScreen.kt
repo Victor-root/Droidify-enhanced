@@ -44,6 +44,7 @@ import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.input.clearText
@@ -126,6 +127,7 @@ import com.looker.droidify.data.model.AppMinimal
 import com.looker.droidify.datastore.extension.sortOrderName
 import com.looker.droidify.datastore.model.SortOrder
 import com.looker.droidify.datastore.model.supportedSortOrders
+import com.looker.droidify.compose.components.tvFocusOutline
 import com.looker.droidify.compose.theme.AccentBarHeight
 import com.looker.droidify.compose.theme.LocalAccentBarColor
 import com.looker.droidify.compose.theme.LocalEdgeToEdge
@@ -294,10 +296,13 @@ fun AppListScreen(
     // a key handler on the header moves focus into it. No effect with touch (no D-pad key events).
     val contentFocusRequester = remember { FocusRequester() }
     val isTelevision = LocalIsTelevision.current
+    // On TV the header must never scroll away (the tabs would become unreachable with a remote), so the
+    // collapse-on-scroll is only wired up off TV. Other edge-to-edge behaviour is left untouched.
+    val collapsibleHeader = edgeToEdge && !isTelevision
 
     Scaffold(
-        // Edge-to-edge: let the header collapse as the grid scrolls. Pinned otherwise.
-        modifier = if (edgeToEdge) {
+        // Edge-to-edge: let the header collapse as the grid scrolls. Pinned otherwise (and on TV).
+        modifier = if (collapsibleHeader) {
             Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
         } else {
             Modifier
@@ -305,7 +310,7 @@ fun AppListScreen(
         snackbarHost = { SnackbarHost(externalViewModel.snackbarHostState) },
         topBar = {
             Column(
-                modifier = (if (edgeToEdge) Modifier.collapsingHeader(scrollBehavior) else Modifier)
+                modifier = (if (collapsibleHeader) Modifier.collapsingHeader(scrollBehavior) else Modifier)
                     // D-pad "down" anywhere in the header jumps focus into the content grid (TV).
                     // Fires only while focus is within this header subtree; a no-op on touch.
                     .onPreviewKeyEvent { event ->
@@ -640,6 +645,11 @@ private fun AppTabRow(
             Tab(
                 selected = selected,
                 onClick = { onSelectTab(tab) },
+                // TV only: outline the focused tab so the remote selection is visible (no-op on touch).
+                modifier = Modifier.tvFocusOutline(
+                    shape = RoundedCornerShape(8.dp),
+                    color = LocalOnAccentBarColor.current,
+                ),
                 selectedContentColor = LocalOnAccentBarColor.current,
                 unselectedContentColor = LocalOnAccentBarColor.current.copy(alpha = 0.7f),
                 text = {
@@ -931,7 +941,9 @@ private fun AppListMainTopBar(
         actions = {
             IconButton(
                 onClick = onToggleSearch,
-                modifier = Modifier.size(smallContainerSize(Narrow)),
+                modifier = Modifier.size(smallContainerSize(Narrow))
+                    // TV only: visible focus ring around the action icon (no-op on touch).
+                    .tvFocusOutline(CircleShape, color = LocalOnAccentBarColor.current),
             ) {
                 Icon(
                     painterResource(R.drawable.ic_tabler_search),
@@ -941,7 +953,9 @@ private fun AppListMainTopBar(
             Spacer(Modifier.width(4.dp))
             IconButton(
                 onClick = onSync,
-                modifier = Modifier.size(smallContainerSize(Narrow)),
+                modifier = Modifier.size(smallContainerSize(Narrow))
+                    // TV only: visible focus ring around the action icon (no-op on touch).
+                    .tvFocusOutline(CircleShape, color = LocalOnAccentBarColor.current),
             ) {
                 Icon(
                     painterResource(R.drawable.ic_tabler_refresh),
@@ -952,7 +966,9 @@ private fun AppListMainTopBar(
             Box {
                 IconButton(
                     onClick = { sortExpanded = true },
-                    modifier = Modifier.size(smallContainerSize(Narrow)),
+                    modifier = Modifier.size(smallContainerSize(Narrow))
+                    // TV only: visible focus ring around the action icon (no-op on touch).
+                    .tvFocusOutline(CircleShape, color = LocalOnAccentBarColor.current),
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.Sort,
@@ -985,7 +1001,9 @@ private fun AppListMainTopBar(
             Box {
                 IconButton(
                     onClick = { overflowExpanded = true },
-                    modifier = Modifier.size(smallContainerSize(Narrow)),
+                    modifier = Modifier.size(smallContainerSize(Narrow))
+                    // TV only: visible focus ring around the action icon (no-op on touch).
+                    .tvFocusOutline(CircleShape, color = LocalOnAccentBarColor.current),
                 ) {
                     Icon(
                         Icons.Filled.MoreVert,
