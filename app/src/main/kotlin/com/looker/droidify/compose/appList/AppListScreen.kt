@@ -19,6 +19,9 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -105,6 +108,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -125,6 +129,7 @@ import com.looker.droidify.datastore.model.supportedSortOrders
 import com.looker.droidify.compose.theme.AccentBarHeight
 import com.looker.droidify.compose.theme.LocalAccentBarColor
 import com.looker.droidify.compose.theme.LocalEdgeToEdge
+import com.looker.droidify.compose.theme.LocalIsTelevision
 import com.looker.droidify.compose.theme.LocalOnAccentBarColor
 import com.looker.droidify.compose.theme.LocalStatusBarScrimAlpha
 import com.looker.droidify.compose.theme.accentTopAppBarColors
@@ -288,6 +293,7 @@ fun AppListScreen(
     // "down" on a tab leaves the user stuck in the header. This requester points at the content grid;
     // a key handler on the header moves focus into it. No effect with touch (no D-pad key events).
     val contentFocusRequester = remember { FocusRequester() }
+    val isTelevision = LocalIsTelevision.current
 
     Scaffold(
         // Edge-to-edge: let the header collapse as the grid scrolls. Pinned otherwise.
@@ -370,12 +376,25 @@ fun AppListScreen(
             RepoFetchingState(modifier = Modifier.padding(contentPadding))
             return@Scaffold
         }
+        // On TV, inset the grid content from the screen edges (overscan safe area) and so the focused
+        // tile's scaled-up highlight near an edge isn't clipped. Touch keeps the Scaffold padding as is.
+        val gridContentPadding = if (isTelevision) {
+            val direction = LocalLayoutDirection.current
+            PaddingValues(
+                start = contentPadding.calculateStartPadding(direction) + TvOverscan,
+                top = contentPadding.calculateTopPadding(),
+                end = contentPadding.calculateEndPadding(direction) + TvOverscan,
+                bottom = contentPadding.calculateBottomPadding() + TvOverscan,
+            )
+        } else {
+            contentPadding
+        }
         LazyVerticalGrid(
             // A tile grid (icon + name), the same density as the Discover carousels, shared by every
             // tab so the apps look identical everywhere.
             columns = GridCells.Adaptive(minSize = 100.dp),
             state = gridState,
-            contentPadding = contentPadding,
+            contentPadding = gridContentPadding,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             // Focus target for the header's D-pad "down": as a focus group, requesting focus here
             // lands on the first focusable tile, so TV users can move from the tabs into the apps.
@@ -797,6 +816,10 @@ fun SearchBar(
  *  so the home logo + wordmark have room to be prominent. Shared by both so toggling search doesn't
  *  change the bar height. */
 private val HomeBarHeight = 64.dp
+
+/** Android TV overscan-safe margin added around the app grid, so content (and a focused tile's
+ *  scaled highlight) stays clear of the screen edges. Touch builds never use it. */
+private val TvOverscan = 24.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

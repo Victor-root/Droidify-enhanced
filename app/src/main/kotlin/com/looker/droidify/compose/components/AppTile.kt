@@ -45,6 +45,8 @@ fun AppTile(
         verticalArrangement = spacedBy(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
+            // TV only: a visible focus highlight around the whole tile (no-op on touch).
+            .tvFocusHighlight(MaterialTheme.shapes.large)
             .clickable(onClick = onClick)
             .padding(vertical = 8.dp),
     ) {
