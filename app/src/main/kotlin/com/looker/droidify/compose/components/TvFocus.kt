@@ -23,21 +23,24 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.looker.droidify.compose.theme.LocalIsTelevision
 
 /**
- * Android TV only: the focused element scales up. Layout-neutral (draw-only), so it never shifts its
- * neighbours; safe in non-scrolling rows like the top bar and for compact items like app tiles. A
- * no-op on touch. Not suited to full-width rows, whose scaled width would overflow the screen — use
- * [tvFocusFill] there instead.
+ * Android TV only: the focused element scales up and is lifted above its neighbours. Draw-only
+ * (graphicsLayer + zIndex), so layout never moves; the zIndex means that when the zoom does spill past
+ * the element's box it pops *in front* of its neighbours rather than appearing to collide with them.
+ * The modest default keeps that spill small enough to sit within normal row gaps. A no-op on touch. Not
+ * suited to full-width rows, whose scaled width would overflow the screen — use [tvFocusFill] there.
  */
 @Composable
-fun Modifier.tvFocusScale(focusedScale: Float = 1.15f): Modifier {
+fun Modifier.tvFocusScale(focusedScale: Float = 1.1f): Modifier {
     if (!LocalIsTelevision.current) return this
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) focusedScale else 1f, label = "tvFocusScale")
     return this
         .onFocusChanged { focused = it.isFocused }
+        .zIndex(if (focused) 1f else 0f)
         .graphicsLayer {
             scaleX = scale
             scaleY = scale

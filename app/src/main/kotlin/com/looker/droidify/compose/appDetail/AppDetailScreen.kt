@@ -56,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -1083,9 +1084,14 @@ private fun CategoriesRow(categories: List<String>) {
                 onClick = { },
                 enabled = true,
                 label = { Text(cat) },
-                // TV: the chip simply scales up on focus. A drawn ring sat off the chip's own outline
-                // (the layout bounds are larger than the visible pill), so scale alone reads cleaner.
-                modifier = Modifier.tvFocusScale(),
+                // These category labels do nothing when tapped, so on TV the D-pad skips them rather
+                // than stopping on dead chips (which also removes the focus-zoom overlap between two
+                // adjacent chips). No effect on touch.
+                modifier = if (LocalIsTelevision.current) {
+                    Modifier.focusProperties { canFocus = false }
+                } else {
+                    Modifier
+                },
             )
         }
     }
