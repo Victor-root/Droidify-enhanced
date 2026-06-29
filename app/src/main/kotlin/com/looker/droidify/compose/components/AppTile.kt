@@ -2,6 +2,7 @@ package com.looker.droidify.compose.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement.spacedBy
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
@@ -39,6 +41,9 @@ val TileIconSize = 72.dp
 /** How much the focused tile grows on Android TV. */
 private const val TvFocusedScale = 1.1f
 
+/** The rounded box drawn behind/around a focused tile on Android TV. */
+private val TvTileShape = RoundedCornerShape(16.dp)
+
 /**
  * An app shown as a compact tile (F-Droid Discover style): a large rounded [icon] with an optional
  * "installed" check, and the name on (up to) two centred lines. Shared by the Discover carousels and
@@ -54,17 +59,30 @@ fun AppTile(
     modifier: Modifier = Modifier,
     icon: @Composable () -> Unit,
 ) {
-    // Android TV: the focused tile simply scales up (no box). The scale is applied *below* the
-    // clickable in the chain so it only changes drawing, never the tile's measured size — scaling the
-    // layout bounds instead made the grid jitter as it kept re-scrolling to fit the enlarged item. No
-    // effect on touch (flag is false).
+    // Android TV: the focused tile scales up inside a green focus box (see below). The scale is applied
+    // *below* the clickable in the chain so it only changes drawing, never the tile's measured size —
+    // scaling the layout bounds instead made the grid jitter as it kept re-scrolling to fit the enlarged
+    // item. No effect on touch (flag is false).
     val isTelevision = LocalIsTelevision.current
     var focused by remember { mutableStateOf(false) }
-    // Only build the animation on TV, so the touch path is exactly as before (no animation objects).
+    // Only build the animations on TV, so the touch path is exactly as before (no animation objects).
     val scale = if (isTelevision) {
         animateFloatAsState(if (focused) TvFocusedScale else 1f, label = "tvTileScale").value
     } else {
         1f
+    }
+    // The focused tile also gains a soft green fill and a solid green outline (the theme accent), so it
+    // reads clearly even at a glance from across the room. Both fade with focus; off on touch.
+    val accent = MaterialTheme.colorScheme.primary
+    val fillAlpha = if (isTelevision) {
+        animateFloatAsState(if (focused) 0.18f else 0f, label = "tvTileFill").value
+    } else {
+        0f
+    }
+    val borderAlpha = if (isTelevision) {
+        animateFloatAsState(if (focused) 1f else 0f, label = "tvTileBorder").value
+    } else {
+        0f
     }
 
     Column(
@@ -82,8 +100,8 @@ fun AppTile(
                     Modifier
                 },
             )
-            // On TV the focus feedback is the scale alone, so we drop the clickable's default state
-            // layer (a grey square drawn on the tile's rectangular bounds); the touch path keeps its
+            // Drop the clickable's default state layer on TV (a grey square drawn on the tile's
+            // rectangular bounds); our own green focus box below replaces it. The touch path keeps its
             // normal ripple.
             .then(
                 if (isTelevision) {
@@ -96,18 +114,24 @@ fun AppTile(
                     Modifier.clickable(onClick = onClick)
                 },
             )
-            // Draw-only scale, below the clickable so it never changes the tile's measured size.
+            // Below the clickable so none of this changes the tile's measured size: the draw-only zoom,
+            // then the green focus box (outline + soft fill) that scales up with it. Touch keeps just the
+            // original vertical padding.
             .then(
                 if (isTelevision) {
-                    Modifier.graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                    }
-                } else {
                     Modifier
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                        }
+                        .padding(4.dp)
+                        .border(2.dp, accent.copy(alpha = borderAlpha), TvTileShape)
+                        .background(accent.copy(alpha = fillAlpha), TvTileShape)
+                        .padding(horizontal = 4.dp, vertical = 8.dp)
+                } else {
+                    Modifier.padding(vertical = 8.dp)
                 },
-            )
-            .padding(vertical = 8.dp),
+            ),
     ) {
         Box {
             icon()
