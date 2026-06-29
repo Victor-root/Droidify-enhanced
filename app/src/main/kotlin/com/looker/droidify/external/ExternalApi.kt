@@ -12,6 +12,12 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import org.commonmark.ext.autolink.AutolinkExtension
+import org.commonmark.ext.gfm.strikethrough.StrikethroughExtension
+import org.commonmark.ext.gfm.tables.TablesExtension
+import org.commonmark.ext.task.list.items.TaskListItemsExtension
+import org.commonmark.parser.Parser
+import org.commonmark.renderer.html.HtmlRenderer
 import java.net.URLEncoder
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -193,8 +199,9 @@ class ExternalApi @Inject constructor(
 
     /**
      * The project README as HTML, for display on the detail screen. GitHub renders it for us
-     * (Accept: application/vnd.github.html); the other providers have no equally simple endpoint, so
-     * they return null for now. Returns null on any failure or when there is no README.
+     * (Accept: application/vnd.github.html); for Gitea/Forgejo and GitLab the raw Markdown is fetched
+     * and rendered locally ([renderMarkdownToHtml]). Returns null on any failure or when there is no
+     * README.
      */
     suspend fun readmeHtml(app: ExternalApp): String? = withContext(Dispatchers.IO) {
         runCatching {
@@ -210,9 +217,24 @@ class ExternalApi @Inject constructor(
                     if (response.status.isSuccess()) response.bodyAsText() else null
                 }
 
-                SourceProvider.GITLAB, SourceProvider.CODEBERG -> null
+                // Gitea/Forgejo (codeberg.org + self-hosted) and GitLab have no free rendered-HTML
+                // README endpoint, so fetch the raw Markdown and render it locally. Relative links and
+                // images resolve against the same branchless raw base in the WebView.
+                SourceProvider.CODEBERG, SourceProvider.GITLAB -> {
+                    val markdown = fetchRawReadme(app) ?: return@runCatching null
+                    renderMarkdownToHtml(markdown)
+                }
             }
         }.getOrNull()
+    }
+
+    /** Fetches a project's raw README Markdown by trying the common file names against the provider's
+     *  branchless raw base ([ExternalApp.readmeBaseUrl]). Null when none is found. */
+    private suspend fun fetchRawReadme(app: ExternalApp): String? {
+        for (name in README_NAMES) {
+            runCatching { getText(app.readmeBaseUrl + name) }.getOrNull()?.let { return it }
+        }
+        return null
     }
 
     /**
@@ -446,6 +468,28 @@ private fun densityRank(dir: String): Int = when {
 /** A raw, always-current URL for a file in a GitHub repo (HEAD = the default branch). */
 private fun rawUrl(owner: String, repo: String, path: String): String =
     "https://raw.githubusercontent.com/$owner/$repo/HEAD/$path"
+
+/** README file names tried in order against a repo's branchless raw base. */
+private val README_NAMES = listOf(
+    "README.md", "readme.md", "Readme.md", "README.markdown", "README.MD", "README", "readme",
+)
+
+/** GitHub-flavoured Markdown extensions: tables, strikethrough, autolinks and task lists. */
+private val MARKDOWN_EXTENSIONS = listOf(
+    TablesExtension.create(),
+    StrikethroughExtension.create(),
+    AutolinkExtension.create(),
+    TaskListItemsExtension.create(),
+)
+private val markdownParser: Parser = Parser.builder().extensions(MARKDOWN_EXTENSIONS).build()
+private val markdownRenderer: HtmlRenderer =
+    HtmlRenderer.builder().extensions(MARKDOWN_EXTENSIONS).build()
+
+/** Renders Markdown to an HTML fragment locally (no network, no external service). Relative links and
+ *  images stay relative so the WebView resolves them against the repo's raw base. Raw HTML in the
+ *  source is passed through (as GitHub does); the WebView runs no JavaScript, so it stays inert. */
+private fun renderMarkdownToHtml(markdown: String): String =
+    markdownRenderer.render(markdownParser.parse(markdown))
 
 /** Icon candidates + the real app name detected from a source repo, shown before install. */
 data class RepoMetadata(

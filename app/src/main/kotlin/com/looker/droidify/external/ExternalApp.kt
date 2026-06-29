@@ -89,6 +89,15 @@ data class ExternalApp(
      *  "Codeberg" just because it shares the Gitea API. */
     val sourceLabel: String get() = if (host.isEmpty()) provider.label else host
 
+    /** Branchless raw base for the project's files. Doubles as the README-fetch prefix and the base the
+     *  README WebView resolves relative links/images against, so no default-branch lookup is needed. */
+    val readmeBaseUrl: String
+        get() = when (provider) {
+            SourceProvider.GITHUB -> "https://raw.githubusercontent.com/$owner/$repo/HEAD/"
+            SourceProvider.CODEBERG -> "https://$effectiveHost/api/v1/repos/$owner/$repo/raw/"
+            SourceProvider.GITLAB -> "https://$effectiveHost/$owner/$repo/-/raw/HEAD/"
+        }
+
     /**
      * A logo to show *before* the app is installed: the source account's avatar. GitHub exposes a
      * stable per-owner avatar at `github.com/<owner>.png` (for AdAway that's the AdAway logo). The
