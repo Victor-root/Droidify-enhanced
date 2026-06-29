@@ -13,9 +13,9 @@
 
 _Omnify, maintained by [Victor-root](https://github.com/Victor-root), based on [Droid-ify](https://github.com/Droid-ify/client) by LooKeR._
 
-[![Latest release](https://img.shields.io/github/v/release/Victor-root/Droidify-enhanced?display_name=tag&color=%23d97706&style=for-the-badge)](https://github.com/Victor-root/Droidify-enhanced/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/Victor-root/Droidify-enhanced/total.svg?color=%236f9645&style=for-the-badge)](https://github.com/Victor-root/Droidify-enhanced/releases/)
-[![Stars](https://img.shields.io/github/stars/Victor-root/Droidify-enhanced?color=%2359a14f&style=for-the-badge)](https://github.com/Victor-root/Droidify-enhanced/stargazers)
+[![Latest release](https://img.shields.io/github/v/release/Victor-root/Omnify?display_name=tag&color=%23d97706&style=for-the-badge)](https://github.com/Victor-root/Omnify/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Victor-root/Omnify/total.svg?color=%236f9645&style=for-the-badge)](https://github.com/Victor-root/Omnify/releases/)
+[![Stars](https://img.shields.io/github/stars/Victor-root/Omnify?color=%2359a14f&style=for-the-badge)](https://github.com/Victor-root/Omnify/stargazers)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](LICENSE)
 
 </div>
@@ -133,7 +133,7 @@ you pick the on-device engine.
 ## 🚀 Get started
 
 **Download:** the latest APK from
-[**GitHub Releases**](https://github.com/Victor-root/Droidify-enhanced/releases/latest).
+[**GitHub Releases**](https://github.com/Victor-root/Omnify/releases/latest).
 **Build from source:** see the [Building Guide](docs/building.md).
 
 > Requires Android 6.0 (API 23) or newer. Ships in English and full (formal)

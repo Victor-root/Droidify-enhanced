@@ -130,7 +130,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) format:
 ## 🔐 Security
 
 **Do not** report security vulnerabilities through public GitHub issues. Instead, report them
-privately via [GitHub Security Advisories](https://github.com/Victor-root/Droidify-enhanced/security/advisories/new) on this repository.
+privately via [GitHub Security Advisories](https://github.com/Victor-root/Omnify/security/advisories/new) on this repository.
 
 ## 📞 Getting Help
 
