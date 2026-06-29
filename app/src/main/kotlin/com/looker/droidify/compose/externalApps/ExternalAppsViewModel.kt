@@ -554,7 +554,7 @@ class ExternalAppsViewModel @Inject constructor(
                     message = if (suggestToken) {
                         context.getString(R.string.external_rate_limited)
                     } else {
-                        context.getString(R.string.external_unreachable, app.provider.label)
+                        context.getString(R.string.external_unreachable, app.sourceLabel)
                     },
                     long = suggestToken,
                 )

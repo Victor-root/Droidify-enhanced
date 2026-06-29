@@ -84,6 +84,11 @@ data class ExternalApp(
 
     val webUrl: String get() = "https://$effectiveHost/$owner/$repo"
 
+    /** Origin shown in the UI: the provider name for a public host (GitHub / GitLab / Codeberg), or the
+     *  actual instance host for a self-hosted source — so a Forgejo at git.example.org isn't labelled
+     *  "Codeberg" just because it shares the Gitea API. */
+    val sourceLabel: String get() = if (host.isEmpty()) provider.label else host
+
     /**
      * A logo to show *before* the app is installed: the source account's avatar. GitHub exposes a
      * stable per-owner avatar at `github.com/<owner>.png` (for AdAway that's the AdAway logo). The
