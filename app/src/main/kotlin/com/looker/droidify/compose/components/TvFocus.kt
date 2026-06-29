@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -42,6 +43,11 @@ fun Modifier.tvFocusScale(focusedScale: Float = 1.15f): Modifier {
  * the element's own bounds and [shape]. Layout-neutral (only a background draw, no size change), so it
  * is safe inside scrolling lists and is the right choice for full-width rows (section headers, list
  * rows) where a scale would overflow the screen edges. A no-op on touch.
+ *
+ * The [clip] is applied first, above the caller's `clickable`, so the focused element's default
+ * Material focus indication (a grey state layer drawn on the clickable's own rectangular bounds) is
+ * forced into the same rounded [shape]; otherwise that grey layer stays a hard square regardless of
+ * the fill shape.
  */
 @Composable
 fun Modifier.tvFocusFill(
@@ -52,6 +58,7 @@ fun Modifier.tvFocusFill(
     var focused by remember { mutableStateOf(false) }
     val alpha by animateFloatAsState(if (focused) 0.16f else 0f, label = "tvFocusFill")
     return this
+        .clip(shape)
         .onFocusChanged { focused = it.isFocused }
         .background(color.copy(alpha = alpha), shape)
 }
