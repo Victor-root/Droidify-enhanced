@@ -42,7 +42,21 @@ class ExternalApi @Inject constructor(
     suspend fun shouldSuggestGithubToken(): Boolean = rateLimited && githubAuthToken() == null
 
     suspend fun latestReleaseFor(app: ExternalApp): Release? =
-        latestRelease(app.provider, app.owner, app.repo, app.includePrereleases, app.apkFilter)
+        latestRelease(
+            app.provider,
+            app.effectiveHost,
+            app.owner,
+            app.repo,
+            app.includePrereleases,
+            app.apkFilter,
+        )
+
+    /** Probes whether [host] runs Gitea/Forgejo by hitting its repo API. Lets a pasted URL whose host
+     *  isn't a known public provider be recognised as a self-hosted instance. Never throws. */
+    suspend fun isGiteaInstance(host: String, owner: String, repo: String): Boolean =
+        withContext(Dispatchers.IO) {
+            runCatching { getText("https://$host/api/v1/repos/$owner/$repo") }.getOrNull() != null
+        }
 
     /**
      * Best-effort application id of the app a source builds, read from its `build.gradle`'s
@@ -71,7 +85,7 @@ class ExternalApi @Inject constructor(
     private suspend fun readRepoFile(app: ExternalApp, path: String): String? = when (app.provider) {
         SourceProvider.GITHUB -> fetchRaw(app, path)
         SourceProvider.CODEBERG -> {
-            val url = "https://codeberg.org/api/v1/repos/${app.owner}/${app.repo}/contents/$path"
+            val url = "https://${app.effectiveHost}/api/v1/repos/${app.owner}/${app.repo}/contents/$path"
             runCatching { getText(url) }.getOrNull()?.let { decodeContentsBase64(it) }
         }
 
@@ -212,6 +226,7 @@ class ExternalApi @Inject constructor(
      */
     suspend fun latestRelease(
         provider: SourceProvider,
+        host: String,
         owner: String,
         repo: String,
         includePrereleases: Boolean = false,
@@ -228,9 +243,10 @@ class ExternalApi @Inject constructor(
                         .pickInstallable(includePrereleases, apkFilter)
                 }
 
+                // Gitea/Forgejo: codeberg.org or any self-hosted instance (same REST shape).
                 SourceProvider.CODEBERG -> {
                     val text = getText(
-                        url = "https://codeberg.org/api/v1/repos/$owner/$repo/releases?limit=10",
+                        url = "https://$host/api/v1/repos/$owner/$repo/releases?limit=10",
                     ) ?: return@runCatching null
                     decodeRest(text).filterNot { it.draft }.map { it.toRelease() }
                         .pickInstallable(includePrereleases, apkFilter)
@@ -239,7 +255,7 @@ class ExternalApi @Inject constructor(
                 SourceProvider.GITLAB -> {
                     val path = URLEncoder.encode("$owner/$repo", "UTF-8")
                     val text = getText(
-                        url = "https://gitlab.com/api/v4/projects/$path/releases?per_page=10",
+                        url = "https://$host/api/v4/projects/$path/releases?per_page=10",
                     ) ?: return@runCatching null
                     decodeGitlab(text).map { it.toRelease() }
                         .pickInstallable(includePrereleases, apkFilter)

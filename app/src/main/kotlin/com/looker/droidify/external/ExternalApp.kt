@@ -14,6 +14,10 @@ data class ExternalApp(
     val provider: SourceProvider = SourceProvider.GITHUB,
     val owner: String,
     val repo: String,
+    /** The instance host, e.g. "git.example.org" for a self-hosted Gitea/Forgejo. Empty means the
+     *  provider's public host (github.com / gitlab.com / codeberg.org), so every existing source keeps
+     *  working unchanged and old backups deserialize as before. */
+    val host: String = "",
     val label: String = repo,
     /** Resolved from the installed APK's manifest; null until first installed. */
     val packageName: String? = null,
@@ -56,19 +60,29 @@ data class ExternalApp(
      *  adaptive icons (so [repoIconUrl] stays null) from being re-scanned on every refresh. */
     val iconChecked: Boolean = false,
 ) {
-    /** Stable identity for lists / de-duplication (provider-scoped, so the same owner/repo on two
-     *  providers stays distinct). */
-    val key: String get() = "${provider.name}/$owner/$repo"
+    /** The host actually called: [host] when set, otherwise the provider's public default. */
+    val effectiveHost: String
+        get() = host.ifEmpty {
+            when (provider) {
+                SourceProvider.GITHUB -> "github.com"
+                SourceProvider.GITLAB -> "gitlab.com"
+                SourceProvider.CODEBERG -> "codeberg.org"
+            }
+        }
+
+    /** Stable identity for lists / de-duplication (provider- and host-scoped, so the same owner/repo on
+     *  two instances stays distinct). Keeps the old format for public sources so existing data matches. */
+    val key: String
+        get() = if (host.isEmpty()) {
+            "${provider.name}/$owner/$repo"
+        } else {
+            "${provider.name}/$host/$owner/$repo"
+        }
 
     /** "owner/repo", shown in the UI. */
     val path: String get() = "$owner/$repo"
 
-    val webUrl: String
-        get() = when (provider) {
-            SourceProvider.GITHUB -> "https://github.com/$owner/$repo"
-            SourceProvider.GITLAB -> "https://gitlab.com/$owner/$repo"
-            SourceProvider.CODEBERG -> "https://codeberg.org/$owner/$repo"
-        }
+    val webUrl: String get() = "https://$effectiveHost/$owner/$repo"
 
     /**
      * A logo to show *before* the app is installed: the source account's avatar. GitHub exposes a
@@ -77,9 +91,9 @@ data class ExternalApp(
      * app is installed (then the real launcher icon is used).
      */
     val iconUrl: String?
-        get() = when (provider) {
-            SourceProvider.GITHUB -> "https://github.com/$owner.png"
-            SourceProvider.GITLAB, SourceProvider.CODEBERG -> null
+        get() = when {
+            provider == SourceProvider.GITHUB && host.isEmpty() -> "https://github.com/$owner.png"
+            else -> null
         }
 
     /**

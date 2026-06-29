@@ -370,6 +370,7 @@
     <string name="external_empty_hint">Add a project (e.g. github.com/owner/repo) to install and update its release APKs directly, like Obtainium.</string>
     <string name="external_empty_tab">No external apps yet.\nAdd sources from the Repositories screen.</string>
     <string name="external_invalid_url">Not a valid project URL (GitHub, GitLab or Codeberg)</string>
+    <string name="external_unsupported_host">Unsupported host. Use GitHub, GitLab, Codeberg, or a self-hosted Gitea/Forgejo instance.</string>
     <string name="external_already_added">%1$s is already in your list</string>
     <string name="external_no_release">No release found for %1$s (or rate-limited)</string>
     <string name="external_added">Added %1$s</string>
