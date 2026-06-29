@@ -77,6 +77,7 @@ import com.looker.droidify.compose.components.DescriptionTranslation
 import com.looker.droidify.compose.components.DownloadProgressRow
 import com.looker.droidify.compose.components.InstallingRow
 import com.looker.droidify.compose.components.TranslateAction
+import com.looker.droidify.compose.components.tvFocusOutline
 import com.looker.droidify.data.model.App
 import com.looker.droidify.data.model.FilePath
 import com.looker.droidify.data.model.Package
@@ -279,6 +280,10 @@ private fun PrimaryActions(
     modifier: Modifier = Modifier,
 ) {
     val installing = installState == InstallState.Pending || installState == InstallState.Installing
+    // TV focus ring for the action buttons: a pill matching the button shape. The filled buttons are
+    // accent-coloured, so their ring uses the contrasting onPrimary colour to stay visible.
+    val filledButtonShape = RoundedCornerShape(50)
+    val filledButtonFocus = MaterialTheme.colorScheme.onPrimary
     when {
         downloadStatus != null -> DownloadProgressRow(
             status = downloadStatus,
@@ -298,21 +303,24 @@ private fun PrimaryActions(
             when {
                 !isInstalled -> Button(
                     onClick = onInstallOrUpdate,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).tvFocusOutline(filledButtonShape, filledButtonFocus),
                 ) { Text(stringResource(R.string.install)) }
 
                 updateAvailable -> Button(
                     onClick = onInstallOrUpdate,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).tvFocusOutline(filledButtonShape, filledButtonFocus),
                 ) { Text(stringResource(R.string.update)) }
 
                 else -> Button(
                     onClick = onLaunch,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).tvFocusOutline(filledButtonShape, filledButtonFocus),
                 ) { Text(stringResource(R.string.launch)) }
             }
             if (isInstalled) {
-                OutlinedButton(onClick = onUninstall) {
+                OutlinedButton(
+                    onClick = onUninstall,
+                    modifier = Modifier.tvFocusOutline(filledButtonShape),
+                ) {
                     Text(stringResource(R.string.uninstall))
                 }
             }
@@ -725,6 +733,8 @@ private fun LinkRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            // TV only: visible focus ring on the link row (no-op on touch).
+            .tvFocusOutline(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
@@ -844,6 +854,8 @@ private fun PermissionsSection(permissions: List<Permission>) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                // TV only: visible focus ring on the permissions toggle (no-op on touch).
+                .tvFocusOutline(RoundedCornerShape(12.dp))
                 .clickable { expanded = !expanded }
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -911,6 +923,8 @@ private fun ScreenshotsRow(screenshots: List<FilePath>) {
                     .widthIn(min = 90.dp)
                     .clip(MaterialTheme.shapes.small)
                     .background(MaterialTheme.colorScheme.surfaceContainer)
+                    // TV only: visible focus ring on the screenshot (no-op on touch).
+                    .tvFocusOutline(MaterialTheme.shapes.small)
                     .clickable { fullscreenIndex = index },
             ) {
                 when (imageState) {
