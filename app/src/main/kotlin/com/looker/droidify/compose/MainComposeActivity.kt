@@ -115,14 +115,17 @@ class MainComposeActivity : ComponentActivity() {
 
     /** The app's own update channel: github.com/Victor-root/Omnify, tracked as an external source.
      *  [packageName] is the stable release id, so the entry is matched to the installed app right away
-     *  (real name, version and icon). Stable releases only, and no installed tag is recorded, so it can
-     *  never show a false update before the user has installed one release through Omnify. */
+     *  (real name, version and icon). [installedTag] is set to the stable version this build ships
+     *  (the alpha/debug suffix is stripped), so the first newer release is detected by tag right away;
+     *  once the user installs a release through Omnify, the more reliable APK-token check takes over.
+     *  This relies on the GitHub release tags matching the versionName (e.g. "1.0"). Stable only. */
     private fun omnifyUpdateSource(): ExternalApp = ExternalApp(
         provider = SourceProvider.GITHUB,
         owner = OMNIFY_SOURCE_OWNER,
         repo = OMNIFY_SOURCE_REPO,
         label = OMNIFY_SOURCE_REPO,
         packageName = OMNIFY_PACKAGE_NAME,
+        installedTag = BuildConfig.VERSION_NAME.removeSuffix(".a").removeSuffix(".d"),
         enabled = true,
     )
 

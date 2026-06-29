@@ -26,7 +26,7 @@ val keystoreProperties = Properties().apply {
 val hasReleaseSigning = keystorePropertiesFile.exists()
 
 android {
-    val latestVersionName = "0.8"
+    val latestVersionName = "1.0"
     namespace = "com.looker.droidify"
     compileSdk {
         version = release(36)
@@ -36,7 +36,7 @@ android {
         applicationId = "com.omnify.vroot"
         minSdk = 23
         versionName = latestVersionName
-        versionCode = 800
+        versionCode = 1000
 
         testInstrumentationRunner = "com.looker.droidify.TestRunner"
     }
