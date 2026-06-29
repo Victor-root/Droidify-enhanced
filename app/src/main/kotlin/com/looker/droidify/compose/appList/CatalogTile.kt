@@ -58,14 +58,16 @@ fun AppMinimalIcon(app: AppMinimal, isInstalled: Boolean, modifier: Modifier = M
                 if (fallback != null && fallback != repoIcon) repoIcon = fallback else repoFailed = true
             },
             contentDescription = null,
-            contentScale = ContentScale.Crop,
+            // Fit, not Crop: app icons aren't all square, and cropping sliced the top/bottom off the
+            // round ones. Fit shows the whole icon; for a square icon it fills the box just the same.
+            contentScale = ContentScale.Fit,
             modifier = modifier.clip(MaterialTheme.shapes.large),
         )
 
         launcherIcon != null -> Image(
             bitmap = launcherIcon,
             contentDescription = null,
-            contentScale = ContentScale.Crop,
+            contentScale = ContentScale.Fit,
             modifier = modifier.clip(MaterialTheme.shapes.large),
         )
 

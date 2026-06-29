@@ -66,22 +66,22 @@ fun ExternalAppIcon(
         }
     }
     // Render exactly like a catalogue icon ([AppMinimalIcon]): the image is clipped to the tile shape
-    // and cropped to fill, with NO box behind it — a background only shows for the placeholder. Drawing
-    // the surface box behind every real icon is what left the ugly rounded rectangle around icons that
-    // aren't full-bleed (e.g. a circular logo).
+    // and shown in full (Fit, not Crop, so non-square icons aren't sliced), with NO box behind it — a
+    // background only shows for the placeholder. Drawing the surface box behind every real icon is what
+    // left the ugly rounded rectangle around icons that aren't full-bleed (e.g. a circular logo).
     val shape = MaterialTheme.shapes.large
     when {
         launcherIcon != null -> Image(
             bitmap = launcherIcon,
             contentDescription = null,
-            contentScale = ContentScale.Crop,
+            contentScale = ContentScale.Fit,
             modifier = modifier.size(size).clip(shape),
         )
 
         extractedIcon != null -> Image(
             bitmap = extractedIcon,
             contentDescription = null,
-            contentScale = ContentScale.Crop,
+            contentScale = ContentScale.Fit,
             modifier = modifier.size(size).clip(shape),
         )
 
@@ -89,7 +89,7 @@ fun ExternalAppIcon(
             model = app.repoIconUrl,
             onError = { repoIconFailed = true },
             contentDescription = null,
-            contentScale = ContentScale.Crop,
+            contentScale = ContentScale.Fit,
             modifier = modifier.size(size).clip(shape),
         )
 
@@ -97,7 +97,7 @@ fun ExternalAppIcon(
             model = app.iconUrl,
             onError = { avatarFailed = true },
             contentDescription = null,
-            contentScale = ContentScale.Crop,
+            contentScale = ContentScale.Fit,
             modifier = modifier.size(size).clip(shape),
         )
 
