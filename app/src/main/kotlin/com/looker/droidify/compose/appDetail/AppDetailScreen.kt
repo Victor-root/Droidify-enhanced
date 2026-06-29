@@ -89,6 +89,7 @@ import com.looker.droidify.compose.components.TranslateAction
 import com.looker.droidify.compose.components.tvFocusFill
 import com.looker.droidify.compose.components.tvFocusOutline
 import com.looker.droidify.compose.components.tvFocusScale
+import com.looker.droidify.compose.components.tvReadable
 import com.looker.droidify.compose.theme.LocalIsTelevision
 import com.looker.droidify.data.model.App
 import com.looker.droidify.data.model.FilePath
@@ -530,13 +531,15 @@ private fun AppDetail(
                 Text(
                     text = translated.description,
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    // TV: a D-pad focus stop so the remote can land on the description and scroll it into
+                    // view instead of jumping over it to the buttons below. No-op on touch.
+                    modifier = Modifier.padding(horizontal = 16.dp).tvReadable(),
                 )
             } else {
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp).tvReadable(),
                 )
             }
         }
@@ -744,7 +747,8 @@ private fun WhatsNewSection(whatsNew: String) {
         Text(
             text = whatsNew,
             style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(horizontal = 16.dp),
+            // TV: a D-pad focus stop so the remote can land here and scroll it into view. No-op on touch.
+            modifier = Modifier.padding(horizontal = 16.dp).tvReadable(),
         )
     }
 }

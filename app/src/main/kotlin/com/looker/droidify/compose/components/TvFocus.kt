@@ -3,6 +3,8 @@ package com.looker.droidify.compose.components
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,6 +47,25 @@ fun Modifier.tvFocusScale(focusedScale: Float = 1.1f): Modifier {
             scaleX = scale
             scaleY = scale
         }
+}
+
+/**
+ * Android TV only: turns a non-interactive block (a long description paragraph, the what's-new text…)
+ * into a D-pad focus stop with a faint highlight. Without it the remote skips straight over the text
+ * from one button to the next; as a focus stop, landing on it scrolls it into view so it can be read.
+ * A no-op on touch.
+ */
+@Composable
+fun Modifier.tvReadable(): Modifier {
+    if (!LocalIsTelevision.current) return this
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(8.dp)
+    val alpha by animateFloatAsState(if (focused) 0.10f else 0f, label = "tvReadable")
+    return this
+        .clip(shape)
+        .onFocusChanged { focused = it.isFocused }
+        .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha), shape)
+        .focusable()
 }
 
 /**
