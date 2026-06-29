@@ -85,7 +85,10 @@ import com.looker.droidify.compose.components.DescriptionTranslation
 import com.looker.droidify.compose.components.DownloadProgressRow
 import com.looker.droidify.compose.components.InstallingRow
 import com.looker.droidify.compose.components.TranslateAction
+import com.looker.droidify.compose.components.tvFocusFill
 import com.looker.droidify.compose.components.tvFocusOutline
+import com.looker.droidify.compose.components.tvFocusScaleOutline
+import com.looker.droidify.compose.theme.LocalIsTelevision
 import com.looker.droidify.data.model.App
 import com.looker.droidify.data.model.FilePath
 import com.looker.droidify.data.model.Package
@@ -301,8 +304,9 @@ private fun PrimaryActions(
     modifier: Modifier = Modifier,
 ) {
     val installing = installState == InstallState.Pending || installState == InstallState.Installing
-    // TV focus ring for the action buttons: a pill matching the button shape. The filled buttons are
-    // accent-coloured, so their ring uses the contrasting onPrimary colour to stay visible.
+    // TV focus for the action buttons: the button scales up and shows a ring matching its pill shape. A
+    // ring alone was too easy to miss on the big filled Install button, so it scales too; the filled
+    // buttons are accent-coloured, so the ring uses the contrasting onPrimary colour to stay visible.
     val filledButtonShape = RoundedCornerShape(50)
     val filledButtonFocus = MaterialTheme.colorScheme.onPrimary
     when {
@@ -324,23 +328,23 @@ private fun PrimaryActions(
             when {
                 !isInstalled -> Button(
                     onClick = onInstallOrUpdate,
-                    modifier = Modifier.weight(1f).tvFocusOutline(filledButtonShape, filledButtonFocus),
+                    modifier = Modifier.weight(1f).tvFocusScaleOutline(filledButtonShape, filledButtonFocus),
                 ) { Text(stringResource(R.string.install)) }
 
                 updateAvailable -> Button(
                     onClick = onInstallOrUpdate,
-                    modifier = Modifier.weight(1f).tvFocusOutline(filledButtonShape, filledButtonFocus),
+                    modifier = Modifier.weight(1f).tvFocusScaleOutline(filledButtonShape, filledButtonFocus),
                 ) { Text(stringResource(R.string.update)) }
 
                 else -> Button(
                     onClick = onLaunch,
-                    modifier = Modifier.weight(1f).tvFocusOutline(filledButtonShape, filledButtonFocus),
+                    modifier = Modifier.weight(1f).tvFocusScaleOutline(filledButtonShape, filledButtonFocus),
                 ) { Text(stringResource(R.string.launch)) }
             }
             if (isInstalled) {
                 OutlinedButton(
                     onClick = onUninstall,
-                    modifier = Modifier.tvFocusOutline(filledButtonShape),
+                    modifier = Modifier.tvFocusScaleOutline(filledButtonShape),
                 ) {
                     Text(stringResource(R.string.uninstall))
                 }
@@ -683,6 +687,10 @@ private fun HeaderSection(
         IconToggleButton(
             checked = isFavorite,
             onCheckedChange = { onToggleFavorite() },
+            // TV: square so the focus ring is a clean circle, and scale + ring on focus so it's clear
+            // the heart is selected. No-op on touch.
+            modifier = (if (LocalIsTelevision.current) Modifier.size(48.dp) else Modifier)
+                .tvFocusScaleOutline(CircleShape),
         ) {
             Icon(
                 painter = painterResource(
@@ -759,8 +767,9 @@ private fun LinkRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            // TV only: visible focus ring on the link row (no-op on touch).
-            .tvFocusOutline(RoundedCornerShape(12.dp))
+            // TV only: a soft green fill behind the focused row (a full-width row can't scale without
+            // overflowing the screen). No-op on touch.
+            .tvFocusFill(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
@@ -880,8 +889,8 @@ private fun PermissionsSection(permissions: List<Permission>) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                // TV only: visible focus ring on the permissions toggle (no-op on touch).
-                .tvFocusOutline(RoundedCornerShape(12.dp))
+                // TV only: a soft green fill behind the focused row (no-op on touch).
+                .tvFocusFill(RoundedCornerShape(12.dp))
                 .clickable { expanded = !expanded }
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -1046,6 +1055,8 @@ private fun CategoriesRow(categories: List<String>) {
                 onClick = { },
                 enabled = true,
                 label = { Text(cat) },
+                // TV: scale + ring so it's clear which tag is focused. No-op on touch.
+                modifier = Modifier.tvFocusScaleOutline(RoundedCornerShape(8.dp)),
             )
         }
     }
