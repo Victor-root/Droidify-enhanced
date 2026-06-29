@@ -5,13 +5,13 @@
 
 <div align="center">
 
-<img src="metadata/en-US/images/featureGraphic.png" alt="Droidify Enhanced" width="100%">
+<img src="metadata/en-US/images/featureGraphic.png" alt="Omnify" width="100%">
 
-### Droidify Enhanced
+### Omnify
 
-**A clutter-free F-Droid client, enhanced for daily use.**
+**A clutter-free F-Droid client that also installs apps from anywhere.**
 
-_Enhanced fork maintained by [Victor-root](https://github.com/Victor-root), based on [Droid-ify](https://github.com/Droid-ify/client) by LooKeR._
+_Omnify, maintained by [Victor-root](https://github.com/Victor-root), based on [Droid-ify](https://github.com/Droid-ify/client) by LooKeR._
 
 [![Latest release](https://img.shields.io/github/v/release/Victor-root/Droidify-enhanced?display_name=tag&color=%23d97706&style=for-the-badge)](https://github.com/Victor-root/Droidify-enhanced/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Victor-root/Droidify-enhanced/total.svg?color=%236f9645&style=for-the-badge)](https://github.com/Victor-root/Droidify-enhanced/releases/)
@@ -43,7 +43,7 @@ _Enhanced fork maintained by [Victor-root](https://github.com/Victor-root), base
 
 ## Why this fork?
 
-I use Droidify every day, intensively, and over time I ran into bugs and wanted
+I use Droid-ify every day, intensively, and over time I ran into bugs and wanted
 features that really mattered for that kind of daily use. I proposed fixes
 upstream, but many of them were built with AI assistance, and the
 [Droid-ify](https://github.com/Droid-ify/client) project has chosen to stay
@@ -51,7 +51,7 @@ AI-free. That is entirely their decision to make, so those fixes couldn't be
 merged. Forking was the only way for me to keep improving the app at my own pace.
 
 **To be clear, this is not a fork against Droid-ify.** I have deep respect for the
-original project, its author and its vision for the codebase. Droidify Enhanced
+original project, its author and its vision for the codebase. Omnify
 simply serves a different need, my own, and only exists because Droid-ify gave it
 such a strong foundation.
 
@@ -154,10 +154,10 @@ welcome too. Start with the [Contributing Guide](CONTRIBUTING.md).
 ## 📄 License
 
 ```
-Droidify Enhanced, a fork of Droid-ify
+Omnify, a fork of Droid-ify
 
 Copyright (C) 2025 LooKeR (original Droid-ify)
-Copyright (C) 2026 Victor-root (Droidify Enhanced fork)
+Copyright (C) 2026 Victor-root (Omnify fork)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

@@ -18,7 +18,7 @@ body:
           required: true
         - label: I'm not requesting app support for a specific repo — that's up to repo maintainers
           required: true
-        - label: I understand this might not get built (Droid-ify is maintained by a single person)
+        - label: I understand this might not get built (Omnify is maintained by a single person)
           required: true
   - type: textarea
     id: problem

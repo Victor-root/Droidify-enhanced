@@ -54,7 +54,7 @@ body:
   - type: input
     id: app-version
     attributes:
-      label: Droid-ify version
+      label: Omnify version
       description: Check in Settings or About
       placeholder: e.g. v0.5.1
     validations:

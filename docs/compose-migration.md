@@ -1,4 +1,4 @@
-# Plan de migration vers Jetpack Compose — Droidify Enhanced
+# Plan de migration vers Jetpack Compose — Omnify
 
 > Objectif : migrer **toute** l'app de l'ancien système (Android Views + XML)
 > vers Jetpack Compose, puis **supprimer** l'ancien système. Fait de façon

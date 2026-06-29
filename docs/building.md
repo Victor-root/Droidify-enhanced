@@ -1,6 +1,6 @@
-# Building Droid-ify
+# Building Omnify
 
-Simple guide to build Droid-ify from source.
+Simple guide to build Omnify from source.
 
 ## Prerequisites
 

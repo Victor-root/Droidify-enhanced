@@ -33,7 +33,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.looker.droidify"
+        applicationId = "com.omnify.vroot"
         minSdk = 23
         versionName = latestVersionName
         versionCode = 800

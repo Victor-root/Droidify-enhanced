@@ -1,6 +1,6 @@
-# 🤝 Contributing to Droid-ify
+# 🤝 Contributing to Omnify
 
-Thank you for your interest in contributing to Droid-ify! This document provides guidelines for
+Thank you for your interest in contributing to Omnify! This document provides guidelines for
 contributors.
 
 ## 🌟 Ways to Contribute
@@ -27,7 +27,7 @@ contributors.
 
 ### 🌐 Translations
 
-Help translate Droid-ify via [Weblate](https://hosted.weblate.org/engage/droidify/)
+Help translate Omnify via [Weblate](https://hosted.weblate.org/engage/droidify/)
 
 ### 📖 Documentation
 
@@ -154,4 +154,4 @@ to uphold this code.
 
 ---
 
-**Thank you for contributing to Droid-ify!** 🚀
+**Thank you for contributing to Omnify!** 🚀
