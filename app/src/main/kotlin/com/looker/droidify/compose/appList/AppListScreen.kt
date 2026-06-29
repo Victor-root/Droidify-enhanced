@@ -90,7 +90,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusGroup
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
@@ -278,6 +284,11 @@ fun AppListScreen(
     // its own content, so it's excluded.
     val catalogLoading = isSyncing && newApps.isEmpty() && selectedTab != AppTab.EXTERNAL
 
+    // Android TV / D-pad: Material3's TabRow doesn't release focus downward on its own, so pressing
+    // "down" on a tab leaves the user stuck in the header. This requester points at the content grid;
+    // a key handler on the header moves focus into it. No effect with touch (no D-pad key events).
+    val contentFocusRequester = remember { FocusRequester() }
+
     Scaffold(
         // Edge-to-edge: let the header collapse as the grid scrolls. Pinned otherwise.
         modifier = if (edgeToEdge) {
@@ -288,7 +299,16 @@ fun AppListScreen(
         snackbarHost = { SnackbarHost(externalViewModel.snackbarHostState) },
         topBar = {
             Column(
-                modifier = if (edgeToEdge) Modifier.collapsingHeader(scrollBehavior) else Modifier,
+                modifier = (if (edgeToEdge) Modifier.collapsingHeader(scrollBehavior) else Modifier)
+                    // D-pad "down" anywhere in the header jumps focus into the content grid (TV).
+                    // Fires only while focus is within this header subtree; a no-op on touch.
+                    .onPreviewKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
+                            runCatching { contentFocusRequester.requestFocus() }.isSuccess
+                        } else {
+                            false
+                        }
+                    },
             ) {
                 // A carousel "see all" page takes over the whole header: a back arrow + the section
                 // title, with no tabs, so it reads as its own screen.
@@ -357,6 +377,11 @@ fun AppListScreen(
             state = gridState,
             contentPadding = contentPadding,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
+            // Focus target for the header's D-pad "down": as a focus group, requesting focus here
+            // lands on the first focusable tile, so TV users can move from the tabs into the apps.
+            modifier = Modifier
+                .focusRequester(contentFocusRequester)
+                .focusGroup(),
         ) {
             // Installed package names, used to badge every tile that's already installed.
             val installedPackages = installedVersionNames.keys
