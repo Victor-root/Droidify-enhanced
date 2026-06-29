@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
@@ -72,7 +71,7 @@ fun DiscoverCarousel(
             modifier = Modifier
                 .fillMaxWidth()
                 // TV only: soft fill behind the focused section header (no-op on touch).
-                .tvFocusFill(RoundedCornerShape(12.dp))
+                .tvFocusFill(MaterialTheme.shapes.large)
                 .clickable(onClick = onSeeAll)
                 .padding(start = 16.dp, end = 8.dp),
         ) {
@@ -131,7 +130,7 @@ fun CategoryRow(
         modifier = Modifier
             .fillMaxWidth()
             // TV only: soft fill behind the focused category row (no-op on touch).
-            .tvFocusFill(RoundedCornerShape(12.dp))
+            .tvFocusFill(MaterialTheme.shapes.large)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
