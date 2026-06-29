@@ -82,7 +82,7 @@ class ExternalApi @Inject constructor(
 
     /**
      * Best-effort launcher icons for the app, found in the source repo itself so the card can show the
-     * real icon before anything is installed (Obtainium does the same). Reads the repo's full file tree
+     * real icon before anything is installed. Reads the repo's full file tree
      * in a single request and returns the matching raster launcher icons (PNG/WebP) as raw URLs, best
      * first: highest-density square icon, then round, then adaptive-foreground, then other
      * launcher-named icons. Adaptive/vector (.xml) icons are skipped — they can't be rendered as a plain
