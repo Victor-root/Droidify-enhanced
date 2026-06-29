@@ -218,7 +218,7 @@ fun ExternalAppDetailScreen(
             if (readmeHtml != null) {
                 ReadmeWebView(
                     html = readmeHtml,
-                    baseUrl = app.readmeBaseUrl,
+                    baseUrl = app.readmeWebBaseUrl,
                     onContentHeight = { readmeHeightPx = it },
                     modifier = Modifier
                         .fillMaxWidth()

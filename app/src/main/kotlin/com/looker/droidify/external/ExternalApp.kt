@@ -89,13 +89,23 @@ data class ExternalApp(
      *  "Codeberg" just because it shares the Gitea API. */
     val sourceLabel: String get() = if (host.isEmpty()) provider.label else host
 
-    /** Branchless raw base for the project's files. Doubles as the README-fetch prefix and the base the
-     *  README WebView resolves relative links/images against, so no default-branch lookup is needed. */
+    /** Branchless raw base for fetching the project's files (README, manifest, build files) and for
+     *  loading icons. These clients send a non-browser user-agent, which Gitea's API raw endpoint serves
+     *  the real file to. No default-branch lookup is needed. */
     val readmeBaseUrl: String
         get() = when (provider) {
             SourceProvider.GITHUB -> "https://raw.githubusercontent.com/$owner/$repo/HEAD/"
             SourceProvider.CODEBERG -> "https://$effectiveHost/api/v1/repos/$owner/$repo/raw/"
             SourceProvider.GITLAB -> "https://$effectiveHost/$owner/$repo/-/raw/HEAD/"
+        }
+
+    /** Base the README WebView resolves relative links/images against. It differs from [readmeBaseUrl]
+     *  only for Gitea/Forgejo: that API raw endpoint returns an HTML page (not the file) to browser
+     *  user-agents like the WebView, so the browser-facing web raw path is used for images to load. */
+    val readmeWebBaseUrl: String
+        get() = when (provider) {
+            SourceProvider.CODEBERG -> "https://$effectiveHost/$owner/$repo/raw/HEAD/"
+            else -> readmeBaseUrl
         }
 
     /**
