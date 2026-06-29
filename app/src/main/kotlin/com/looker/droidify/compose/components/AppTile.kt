@@ -3,6 +3,7 @@ package com.looker.droidify.compose.components
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement.spacedBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -81,7 +82,20 @@ fun AppTile(
                     Modifier
                 },
             )
-            .clickable(onClick = onClick)
+            // On TV the focus feedback is the scale alone, so we drop the clickable's default state
+            // layer (a grey square drawn on the tile's rectangular bounds); the touch path keeps its
+            // normal ripple.
+            .then(
+                if (isTelevision) {
+                    Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onClick,
+                    )
+                } else {
+                    Modifier.clickable(onClick = onClick)
+                },
+            )
             // Draw-only scale, below the clickable so it never changes the tile's measured size.
             .then(
                 if (isTelevision) {
