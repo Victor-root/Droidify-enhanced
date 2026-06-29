@@ -12,6 +12,7 @@ import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
@@ -44,7 +45,6 @@ import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.input.clearText
@@ -84,6 +84,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -127,7 +128,8 @@ import com.looker.droidify.data.model.AppMinimal
 import com.looker.droidify.datastore.extension.sortOrderName
 import com.looker.droidify.datastore.model.SortOrder
 import com.looker.droidify.datastore.model.supportedSortOrders
-import com.looker.droidify.compose.components.tvFocusOutline
+import com.looker.droidify.compose.components.NoIndication
+import com.looker.droidify.compose.components.tvFocusScale
 import com.looker.droidify.compose.theme.AccentBarHeight
 import com.looker.droidify.compose.theme.LocalAccentBarColor
 import com.looker.droidify.compose.theme.LocalEdgeToEdge
@@ -309,6 +311,12 @@ fun AppListScreen(
         },
         snackbarHost = { SnackbarHost(externalViewModel.snackbarHostState) },
         topBar = {
+            // TV only: suppress Material's focus/press state layer across the whole header — its tinted
+            // box on the tabs and oval on the action icons looked wrong on the coloured bar; a clean
+            // scale highlight is used there instead. On touch this re-provides the existing indication.
+            CompositionLocalProvider(
+                LocalIndication provides if (isTelevision) NoIndication else LocalIndication.current,
+            ) {
             Column(
                 modifier = (if (collapsibleHeader) Modifier.collapsingHeader(scrollBehavior) else Modifier)
                     // D-pad "down" anywhere in the header jumps focus into the content grid (TV).
@@ -375,6 +383,7 @@ fun AppListScreen(
                     }
                 }
             }
+            }
         },
     ) { contentPadding ->
         if (catalogLoading) {
@@ -387,7 +396,8 @@ fun AppListScreen(
             val direction = LocalLayoutDirection.current
             PaddingValues(
                 start = contentPadding.calculateStartPadding(direction) + TvOverscan,
-                top = contentPadding.calculateTopPadding(),
+                // Extra top gap so a focused first row's highlight doesn't tuck under the pinned header.
+                top = contentPadding.calculateTopPadding() + TvOverscan,
                 end = contentPadding.calculateEndPadding(direction) + TvOverscan,
                 bottom = contentPadding.calculateBottomPadding() + TvOverscan,
             )
@@ -645,11 +655,9 @@ private fun AppTabRow(
             Tab(
                 selected = selected,
                 onClick = { onSelectTab(tab) },
-                // TV only: outline the focused tab so the remote selection is visible (no-op on touch).
-                modifier = Modifier.tvFocusOutline(
-                    shape = RoundedCornerShape(8.dp),
-                    color = LocalOnAccentBarColor.current,
-                ),
+                // TV only: the focused tab scales up (no box). Material's focus state layer is
+                // suppressed on the header (see NoIndication) so no tinted rectangle shows.
+                modifier = Modifier.tvFocusScale(),
                 selectedContentColor = LocalOnAccentBarColor.current,
                 unselectedContentColor = LocalOnAccentBarColor.current.copy(alpha = 0.7f),
                 text = {
@@ -942,8 +950,9 @@ private fun AppListMainTopBar(
             IconButton(
                 onClick = onToggleSearch,
                 modifier = Modifier.size(smallContainerSize(Narrow))
-                    // TV only: visible focus ring around the action icon (no-op on touch).
-                    .tvFocusOutline(CircleShape, color = LocalOnAccentBarColor.current),
+                    // TV only: the focused icon scales up; Material's tinted oval is suppressed on the
+                    // header (see NoIndication), so the highlight stays clean.
+                    .tvFocusScale(),
             ) {
                 Icon(
                     painterResource(R.drawable.ic_tabler_search),
@@ -954,8 +963,9 @@ private fun AppListMainTopBar(
             IconButton(
                 onClick = onSync,
                 modifier = Modifier.size(smallContainerSize(Narrow))
-                    // TV only: visible focus ring around the action icon (no-op on touch).
-                    .tvFocusOutline(CircleShape, color = LocalOnAccentBarColor.current),
+                    // TV only: the focused icon scales up; Material's tinted oval is suppressed on the
+                    // header (see NoIndication), so the highlight stays clean.
+                    .tvFocusScale(),
             ) {
                 Icon(
                     painterResource(R.drawable.ic_tabler_refresh),
@@ -967,8 +977,9 @@ private fun AppListMainTopBar(
                 IconButton(
                     onClick = { sortExpanded = true },
                     modifier = Modifier.size(smallContainerSize(Narrow))
-                    // TV only: visible focus ring around the action icon (no-op on touch).
-                    .tvFocusOutline(CircleShape, color = LocalOnAccentBarColor.current),
+                    // TV only: the focused icon scales up; Material's tinted oval is suppressed on the
+                    // header (see NoIndication), so the highlight stays clean.
+                    .tvFocusScale(),
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.Sort,
@@ -1002,8 +1013,9 @@ private fun AppListMainTopBar(
                 IconButton(
                     onClick = { overflowExpanded = true },
                     modifier = Modifier.size(smallContainerSize(Narrow))
-                    // TV only: visible focus ring around the action icon (no-op on touch).
-                    .tvFocusOutline(CircleShape, color = LocalOnAccentBarColor.current),
+                    // TV only: the focused icon scales up; Material's tinted oval is suppressed on the
+                    // header (see NoIndication), so the highlight stays clean.
+                    .tvFocusScale(),
                 ) {
                     Icon(
                         Icons.Filled.MoreVert,
