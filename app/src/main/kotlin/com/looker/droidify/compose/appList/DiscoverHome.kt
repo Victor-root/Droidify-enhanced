@@ -66,6 +66,9 @@ fun DiscoverCarousel(
     modifier: Modifier = Modifier,
     expanded: Boolean = false,
 ) {
+    // Wider tiles on TV so the larger icon (and its card) fit; the compact width stays on touch. Read
+    // here in the composable body, not inside the LazyRow content (which isn't a composable scope).
+    val tileWidth = if (LocalIsTelevision.current) 124.dp else 80.dp
     Column(verticalArrangement = spacedBy(10.dp), modifier = modifier) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -106,8 +109,6 @@ fun DiscoverCarousel(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = spacedBy(16.dp),
         ) {
-            // Wider tiles on TV so the larger icon (and its card) fit; the compact width stays on touch.
-            val tileWidth = if (LocalIsTelevision.current) 124.dp else 80.dp
             items(apps, key = { it.appId }) { app ->
                 CatalogAppTile(
                     app = app,
