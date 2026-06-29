@@ -25,6 +25,9 @@ import coil3.compose.AsyncImage
 import com.looker.droidify.R
 import com.looker.droidify.external.ExternalApp
 
+/** Square pixel size the system fallback icon is rendered at (generous so it stays crisp at any size). */
+private const val LauncherIconPx = 256
+
 /**
  * Icon for an external app, in priority order:
  *  1. the real launcher icon read from the system, once the app is installed (or extracted from the
@@ -48,7 +51,12 @@ fun ExternalAppIcon(
     val launcherIcon = remember(packageName, isInstalled) {
         if (isInstalled && packageName != null) {
             runCatching {
-                context.packageManager.getApplicationIcon(packageName).toBitmap().asImageBitmap()
+                // Explicit square output: toBitmap() with no size uses the drawable's intrinsic size,
+                // which renders adaptive icons inconsistently across Android versions (fine on newer
+                // phones, cropped/squished on older TV builds). A square normalises it everywhere.
+                context.packageManager.getApplicationIcon(packageName)
+                    .toBitmap(width = LauncherIconPx, height = LauncherIconPx)
+                    .asImageBitmap()
             }.getOrNull()
         } else {
             null

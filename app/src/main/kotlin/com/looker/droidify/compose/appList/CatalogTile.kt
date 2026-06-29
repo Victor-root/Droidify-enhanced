@@ -25,6 +25,10 @@ import com.looker.droidify.compose.components.AppTile
 import com.looker.droidify.compose.components.TileIconSize
 import com.looker.droidify.data.model.AppMinimal
 
+/** Square pixel size the system fallback icon is rendered at (generous so it stays crisp at any tile
+ *  size, including the focus zoom). */
+private const val LauncherIconPx = 256
+
 /**
  * A catalogue app's icon, in priority order:
  *  1. the repo-served icon, falling back to its generic `/icon.png`;
@@ -41,7 +45,13 @@ fun AppMinimalIcon(app: AppMinimal, isInstalled: Boolean, modifier: Modifier = M
     val launcherIcon = remember(app.packageName, isInstalled) {
         if (isInstalled) {
             runCatching {
-                context.packageManager.getApplicationIcon(app.packageName.name).toBitmap().asImageBitmap()
+                // Render into an explicit square bitmap. toBitmap() with no size uses the drawable's
+                // intrinsic size, which for adaptive icons renders inconsistently across Android versions
+                // (fine on newer phones, cropped/squished on older TV builds) — forcing a square output
+                // normalises it everywhere.
+                context.packageManager.getApplicationIcon(app.packageName.name)
+                    .toBitmap(width = LauncherIconPx, height = LauncherIconPx)
+                    .asImageBitmap()
             }.getOrNull()
         } else {
             null
