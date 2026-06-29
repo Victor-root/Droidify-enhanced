@@ -61,32 +61,6 @@ fun Modifier.tvDpadDownTo(target: FocusRequester): Modifier =
     }
 
 /**
- * Android TV only: scales the focused element up *and* draws an accent ring around it, for a focus cue
- * that's obvious even on a filled button seen from across the room (a ring alone can vanish against a
- * same-coloured fill). Draw-only (graphicsLayer + border), so it never shifts neighbours; suited to
- * compact controls (buttons, chips, the favourite toggle). A no-op on touch.
- */
-@Composable
-fun Modifier.tvFocusScaleOutline(
-    shape: Shape,
-    color: Color = MaterialTheme.colorScheme.primary,
-    focusedScale: Float = 1.08f,
-    width: Dp = 3.dp,
-): Modifier {
-    if (!LocalIsTelevision.current) return this
-    var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) focusedScale else 1f, label = "tvFocusScaleOutlineScale")
-    val alpha by animateFloatAsState(if (focused) 1f else 0f, label = "tvFocusScaleOutlineRing")
-    return this
-        .onFocusChanged { focused = it.isFocused }
-        .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-        }
-        .border(width, color.copy(alpha = alpha), shape)
-}
-
-/**
  * Android TV only: fills the background of a focused composable with a soft accent tint, aligned to
  * the element's own bounds and [shape]. Layout-neutral (only a background draw, no size change), so it
  * is safe inside scrolling lists and is the right choice for full-width rows (section headers, list

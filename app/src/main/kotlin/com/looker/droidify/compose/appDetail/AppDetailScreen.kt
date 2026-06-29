@@ -88,7 +88,6 @@ import com.looker.droidify.compose.components.TranslateAction
 import com.looker.droidify.compose.components.tvFocusFill
 import com.looker.droidify.compose.components.tvFocusOutline
 import com.looker.droidify.compose.components.tvFocusScale
-import com.looker.droidify.compose.components.tvFocusScaleOutline
 import com.looker.droidify.compose.theme.LocalIsTelevision
 import com.looker.droidify.data.model.App
 import com.looker.droidify.data.model.FilePath
@@ -306,12 +305,10 @@ private fun PrimaryActions(
 ) {
     val installing = installState == InstallState.Pending || installState == InstallState.Installing
     val isTelevision = LocalIsTelevision.current
-    // TV focus for the action buttons: the button scales up and shows a contrasting ring. On TV the
-    // buttons are sized to their content and centred (not stretched full-width) so the focus zoom stays
-    // on screen instead of overflowing the edges; touch keeps the full-width buttons. The filled buttons
-    // are accent-coloured, so the ring uses the contrasting onPrimary colour to stay visible.
-    val filledButtonShape = RoundedCornerShape(50)
-    val filledButtonFocus = MaterialTheme.colorScheme.onPrimary
+    // TV focus for the action buttons: the button simply scales up (no drawn ring, which floated off a
+    // Material button's elevated, larger-than-visible bounds). On TV the buttons are big and centred (not
+    // stretched full-width), small enough that the focus zoom stays on screen; touch keeps the full-width
+    // buttons. A no-op on touch.
     when {
         downloadStatus != null -> DownloadProgressRow(
             status = downloadStatus,
@@ -331,28 +328,29 @@ private fun PrimaryActions(
                 if (isTelevision) Alignment.CenterHorizontally else Alignment.Start,
             ),
         ) {
-            // Full-width on touch (weight), content-sized on TV so the focus zoom doesn't run off-screen.
-            val primaryButtonModifier = if (isTelevision) Modifier else Modifier.weight(1f)
+            // Big and centred on TV; full-width (weight) on touch.
+            val tvPrimaryButton = if (isTelevision) Modifier.height(60.dp).widthIn(min = 340.dp) else Modifier.weight(1f)
+            val tvSecondaryButton = if (isTelevision) Modifier.height(60.dp).widthIn(min = 200.dp) else Modifier
             when {
                 !isInstalled -> Button(
                     onClick = onInstallOrUpdate,
-                    modifier = primaryButtonModifier.tvFocusScaleOutline(filledButtonShape, filledButtonFocus),
+                    modifier = tvPrimaryButton.tvFocusScale(),
                 ) { Text(stringResource(R.string.install)) }
 
                 updateAvailable -> Button(
                     onClick = onInstallOrUpdate,
-                    modifier = primaryButtonModifier.tvFocusScaleOutline(filledButtonShape, filledButtonFocus),
+                    modifier = tvPrimaryButton.tvFocusScale(),
                 ) { Text(stringResource(R.string.update)) }
 
                 else -> Button(
                     onClick = onLaunch,
-                    modifier = primaryButtonModifier.tvFocusScaleOutline(filledButtonShape, filledButtonFocus),
+                    modifier = tvPrimaryButton.tvFocusScale(),
                 ) { Text(stringResource(R.string.launch)) }
             }
             if (isInstalled) {
                 OutlinedButton(
                     onClick = onUninstall,
-                    modifier = Modifier.tvFocusScaleOutline(filledButtonShape),
+                    modifier = tvSecondaryButton.tvFocusScale(),
                 ) {
                     Text(stringResource(R.string.uninstall))
                 }
@@ -695,10 +693,10 @@ private fun HeaderSection(
         IconToggleButton(
             checked = isFavorite,
             onCheckedChange = { onToggleFavorite() },
-            // TV: square so the focus ring is a clean circle, and scale + ring on focus so it's clear
-            // the heart is selected. No-op on touch.
+            // TV: square so the focus halo is a clean circle, and the heart scales up on focus. No-op
+            // on touch.
             modifier = (if (LocalIsTelevision.current) Modifier.size(48.dp) else Modifier)
-                .tvFocusScaleOutline(CircleShape),
+                .tvFocusScale(),
         ) {
             Icon(
                 painter = painterResource(
