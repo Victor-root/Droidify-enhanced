@@ -35,8 +35,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.looker.droidify.compose.theme.LocalIsTelevision
 
-/** The icon size shared by every catalogue/external app tile. */
+/** The icon size shared by every catalogue/external app tile (touch). */
 val TileIconSize = 72.dp
+
+/** The larger icon size used on Android TV, where there's far more screen to fill and the tiles sit on
+ *  a uniform card. */
+val TvTileIconSize = 104.dp
 
 /** How much the focused tile grows on Android TV. */
 private const val TvFocusedScale = 1.1f

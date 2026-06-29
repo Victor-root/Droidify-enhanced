@@ -446,8 +446,9 @@ fun AppListScreen(
         }
         LazyVerticalGrid(
             // A tile grid (icon + name), the same density as the Discover carousels, shared by every
-            // tab so the apps look identical everywhere.
-            columns = GridCells.Adaptive(minSize = 100.dp),
+            // tab so the apps look identical everywhere. Bigger cells on TV (larger icons, fewer columns)
+            // to use the screen and stay legible from the couch.
+            columns = GridCells.Adaptive(minSize = if (isTelevision) 150.dp else 100.dp),
             state = gridState,
             contentPadding = gridContentPadding,
             horizontalArrangement = Arrangement.spacedBy(4.dp),

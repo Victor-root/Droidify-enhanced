@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.looker.droidify.R
 import com.looker.droidify.compose.components.tvFocusFill
+import com.looker.droidify.compose.theme.LocalIsTelevision
 import com.looker.droidify.data.model.AppMinimal
 import com.looker.droidify.sync.v2.model.DefaultName
 
@@ -105,12 +106,14 @@ fun DiscoverCarousel(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = spacedBy(16.dp),
         ) {
+            // Wider tiles on TV so the larger icon (and its card) fit; the compact width stays on touch.
+            val tileWidth = if (LocalIsTelevision.current) 124.dp else 80.dp
             items(apps, key = { it.appId }) { app ->
                 CatalogAppTile(
                     app = app,
                     isInstalled = app.packageName.name in installedPackages,
                     onClick = { onAppClick(app.packageName.name) },
-                    modifier = Modifier.width(80.dp),
+                    modifier = Modifier.width(tileWidth),
                 )
             }
         }
