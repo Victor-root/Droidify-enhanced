@@ -12,7 +12,6 @@ import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
@@ -84,7 +83,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -128,7 +126,6 @@ import com.looker.droidify.data.model.AppMinimal
 import com.looker.droidify.datastore.extension.sortOrderName
 import com.looker.droidify.datastore.model.SortOrder
 import com.looker.droidify.datastore.model.supportedSortOrders
-import com.looker.droidify.compose.components.NoIndication
 import com.looker.droidify.compose.components.tvFocusScale
 import com.looker.droidify.compose.theme.AccentBarHeight
 import com.looker.droidify.compose.theme.LocalAccentBarColor
@@ -311,12 +308,6 @@ fun AppListScreen(
         },
         snackbarHost = { SnackbarHost(externalViewModel.snackbarHostState) },
         topBar = {
-            // TV only: suppress Material's focus/press state layer across the whole header — its tinted
-            // box on the tabs and oval on the action icons looked wrong on the coloured bar; a clean
-            // scale highlight is used there instead. On touch this re-provides the existing indication.
-            CompositionLocalProvider(
-                LocalIndication provides if (isTelevision) NoIndication else LocalIndication.current,
-            ) {
             Column(
                 modifier = (if (collapsibleHeader) Modifier.collapsingHeader(scrollBehavior) else Modifier)
                     // D-pad "down" anywhere in the header jumps focus into the content grid (TV).
@@ -382,7 +373,6 @@ fun AppListScreen(
                         SyncBanner()
                     }
                 }
-            }
             }
         },
     ) { contentPadding ->
@@ -655,8 +645,7 @@ private fun AppTabRow(
             Tab(
                 selected = selected,
                 onClick = { onSelectTab(tab) },
-                // TV only: the focused tab scales up (no box). Material's focus state layer is
-                // suppressed on the header (see NoIndication) so no tinted rectangle shows.
+                // TV only: the focused tab scales up. No-op on touch.
                 modifier = Modifier.tvFocusScale(),
                 selectedContentColor = LocalOnAccentBarColor.current,
                 unselectedContentColor = LocalOnAccentBarColor.current.copy(alpha = 0.7f),
@@ -949,9 +938,16 @@ private fun AppListMainTopBar(
         actions = {
             IconButton(
                 onClick = onToggleSearch,
-                modifier = Modifier.size(smallContainerSize(Narrow))
-                    // TV only: the focused icon scales up; Material's tinted oval is suppressed on the
-                    // header (see NoIndication), so the highlight stays clean.
+                modifier = Modifier
+                    // TV: a square button so the focus halo is a clean circle (the narrow expressive
+                    // size makes it an oval); the focused icon also scales up. Unchanged on touch.
+                    .then(
+                        if (LocalIsTelevision.current) {
+                            Modifier.size(48.dp)
+                        } else {
+                            Modifier.size(smallContainerSize(Narrow))
+                        },
+                    )
                     .tvFocusScale(),
             ) {
                 Icon(
@@ -962,9 +958,16 @@ private fun AppListMainTopBar(
             Spacer(Modifier.width(4.dp))
             IconButton(
                 onClick = onSync,
-                modifier = Modifier.size(smallContainerSize(Narrow))
-                    // TV only: the focused icon scales up; Material's tinted oval is suppressed on the
-                    // header (see NoIndication), so the highlight stays clean.
+                modifier = Modifier
+                    // TV: a square button so the focus halo is a clean circle (the narrow expressive
+                    // size makes it an oval); the focused icon also scales up. Unchanged on touch.
+                    .then(
+                        if (LocalIsTelevision.current) {
+                            Modifier.size(48.dp)
+                        } else {
+                            Modifier.size(smallContainerSize(Narrow))
+                        },
+                    )
                     .tvFocusScale(),
             ) {
                 Icon(
@@ -976,9 +979,16 @@ private fun AppListMainTopBar(
             Box {
                 IconButton(
                     onClick = { sortExpanded = true },
-                    modifier = Modifier.size(smallContainerSize(Narrow))
-                    // TV only: the focused icon scales up; Material's tinted oval is suppressed on the
-                    // header (see NoIndication), so the highlight stays clean.
+                    modifier = Modifier
+                    // TV: a square button so the focus halo is a clean circle (the narrow expressive
+                    // size makes it an oval); the focused icon also scales up. Unchanged on touch.
+                    .then(
+                        if (LocalIsTelevision.current) {
+                            Modifier.size(48.dp)
+                        } else {
+                            Modifier.size(smallContainerSize(Narrow))
+                        },
+                    )
                     .tvFocusScale(),
                 ) {
                     Icon(
@@ -1012,9 +1022,16 @@ private fun AppListMainTopBar(
             Box {
                 IconButton(
                     onClick = { overflowExpanded = true },
-                    modifier = Modifier.size(smallContainerSize(Narrow))
-                    // TV only: the focused icon scales up; Material's tinted oval is suppressed on the
-                    // header (see NoIndication), so the highlight stays clean.
+                    modifier = Modifier
+                    // TV: a square button so the focus halo is a clean circle (the narrow expressive
+                    // size makes it an oval); the focused icon also scales up. Unchanged on touch.
+                    .then(
+                        if (LocalIsTelevision.current) {
+                            Modifier.size(48.dp)
+                        } else {
+                            Modifier.size(smallContainerSize(Narrow))
+                        },
+                    )
                     .tvFocusScale(),
                 ) {
                     Icon(

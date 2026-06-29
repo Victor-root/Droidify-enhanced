@@ -2,7 +2,6 @@ package com.looker.droidify.compose.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement.spacedBy
 import androidx.compose.foundation.layout.Box
@@ -54,25 +53,18 @@ fun AppTile(
     modifier: Modifier = Modifier,
     icon: @Composable () -> Unit,
 ) {
-    // Android TV: give the focused tile a clear, pointer-free highlight — it scales up and gains an
-    // accent outline. The scale/outline are applied *below* the clickable in the chain so they only
-    // change drawing, never the tile's measured size: scaling the layout bounds instead made the grid
-    // jitter, as it kept re-scrolling to fit the enlarged item. No effect on touch (flag is false).
+    // Android TV: the focused tile simply scales up (no box). The scale is applied *below* the
+    // clickable in the chain so it only changes drawing, never the tile's measured size — scaling the
+    // layout bounds instead made the grid jitter as it kept re-scrolling to fit the enlarged item. No
+    // effect on touch (flag is false).
     val isTelevision = LocalIsTelevision.current
     var focused by remember { mutableStateOf(false) }
-    // Only build the animations on TV, so the touch path is exactly as before (no animation objects).
+    // Only build the animation on TV, so the touch path is exactly as before (no animation objects).
     val scale = if (isTelevision) {
         animateFloatAsState(if (focused) TvFocusedScale else 1f, label = "tvTileScale").value
     } else {
         1f
     }
-    val outlineAlpha = if (isTelevision) {
-        animateFloatAsState(if (focused) 1f else 0f, label = "tvTileOutline").value
-    } else {
-        0f
-    }
-    val outlineColor = MaterialTheme.colorScheme.primary
-    val tileShape = MaterialTheme.shapes.large
 
     Column(
         verticalArrangement = spacedBy(8.dp),
@@ -90,15 +82,13 @@ fun AppTile(
                 },
             )
             .clickable(onClick = onClick)
-            // Draw-only highlight, below the clickable so it never changes the tile's measured size.
+            // Draw-only scale, below the clickable so it never changes the tile's measured size.
             .then(
                 if (isTelevision) {
-                    Modifier
-                        .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                        }
-                        .border(3.dp, outlineColor.copy(alpha = outlineAlpha), tileShape)
+                    Modifier.graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                    }
                 } else {
                     Modifier
                 },
