@@ -1,7 +1,9 @@
 package com.looker.droidify.external
 
+import android.util.Base64
 import com.looker.droidify.datastore.SettingsRepository
 import io.ktor.client.HttpClient
+import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
@@ -229,11 +231,12 @@ class ExternalApi @Inject constructor(
                 }
 
                 // Gitea/Forgejo (codeberg.org + self-hosted) and GitLab have no free rendered-HTML
-                // README endpoint, so fetch the raw Markdown and render it locally. Relative links and
-                // images resolve against the same branchless raw base in the WebView.
+                // README endpoint, so fetch the raw Markdown and render it locally. Their raw endpoints
+                // content-negotiate (serving an HTML page to the WebView's requests, not the file), so
+                // the README's own relative images are fetched here and inlined as data URIs.
                 SourceProvider.CODEBERG, SourceProvider.GITLAB -> {
                     val markdown = fetchRawReadme(app) ?: return@runCatching null
-                    renderMarkdownToHtml(markdown)
+                    inlineRelativeImages(renderMarkdownToHtml(markdown), app)
                 }
             }
         }.getOrNull()
@@ -246,6 +249,48 @@ class ExternalApi @Inject constructor(
             runCatching { getText(app.readmeBaseUrl + name) }.getOrNull()?.let { return it }
         }
         return null
+    }
+
+    /**
+     * Replaces relative `<img>` sources in rendered README HTML with `data:` URIs of the actual image
+     * bytes. Gitea/GitLab raw endpoints decide between the file and an HTML viewer page from request
+     * headers the WebView doesn't send for sub-resources, so a plain relative URL would load the HTML
+     * page instead of the image. Fetching here (a non-browser client gets the real bytes) sidesteps that.
+     * Absolute URLs (e.g. shields.io badges) are left untouched, as are images that fail or are too big.
+     */
+    private suspend fun inlineRelativeImages(html: String, app: ExternalApp): String {
+        val relativeSrcs = IMG_SRC_REGEX.findAll(html)
+            .map { it.groupValues[1] }
+            .filterNot { it.startsWith("http://", true) || it.startsWith("https://", true) ||
+                it.startsWith("//") || it.startsWith("data:", true) }
+            .distinct()
+            .toList()
+        if (relativeSrcs.isEmpty()) return html
+        val replacements = HashMap<String, String>()
+        for (src in relativeSrcs) {
+            val path = src.removePrefix("./").substringBefore('?').substringBefore('#')
+            val dataUri = fetchImageAsDataUri(app.readmeBaseUrl + path) ?: continue
+            replacements[src] = dataUri
+        }
+        if (replacements.isEmpty()) return html
+        return IMG_SRC_REGEX.replace(html) { match ->
+            val dataUri = replacements[match.groupValues[1]] ?: return@replace match.value
+            match.value.replace("src=\"${match.groupValues[1]}\"", "src=\"$dataUri\"")
+        }
+    }
+
+    /** Downloads an image and returns it as a `data:` URI, or null on failure / non-image / oversize. */
+    private suspend fun fetchImageAsDataUri(url: String): String? {
+        val response = httpClient.get(url)
+        if (!response.status.isSuccess()) return null
+        val contentType = response.headers["Content-Type"]?.substringBefore(';')?.trim().orEmpty()
+        if (!contentType.startsWith("image/")) return null
+        response.headers["Content-Length"]?.toLongOrNull()?.let {
+            if (it > MAX_INLINE_IMAGE_BYTES) return null
+        }
+        val bytes: ByteArray = response.body()
+        if (bytes.size > MAX_INLINE_IMAGE_BYTES) return null
+        return "data:$contentType;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
     }
 
     /**
@@ -464,6 +509,12 @@ private fun densityRank(dir: String): Int = when {
 
 /** How many 100-item pages of GitLab's tree API to walk while looking for the manifest / icons. */
 private const val GITLAB_TREE_MAX_PAGES = 10
+
+/** Largest README image inlined as a data URI; bigger ones are left as-is to avoid bloating the HTML. */
+private const val MAX_INLINE_IMAGE_BYTES = 1_000_000
+
+/** Captures the `src` of an `<img>` tag (CommonMark output and any raw HTML in the README). */
+private val IMG_SRC_REGEX = Regex("""<img\b[^>]*?\bsrc="([^"]+)"[^>]*>""", RegexOption.IGNORE_CASE)
 
 /** README file names tried in order against a repo's branchless raw base. */
 private val README_NAMES = listOf(
