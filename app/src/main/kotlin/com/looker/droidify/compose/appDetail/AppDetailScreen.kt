@@ -100,6 +100,7 @@ import com.looker.droidify.installer.model.InstallState
 import com.looker.droidify.utility.text.toAnnotatedString
 import com.looker.droidify.compose.theme.AccentBarHeight
 import com.looker.droidify.compose.theme.accentTopAppBarColors
+import kotlinx.coroutines.delay
 
 /**
  * Maximum number of version rows rendered on the detail screen. The screen is a single
@@ -188,10 +189,24 @@ fun AppDetailScreen(
         )
     }
 
-    // TV / D-pad: the TopAppBar doesn't release focus downward on its own, so "down" on the back arrow
-    // would leave the user stuck in the header. This requester points at the scrollable content; the
-    // key handler below moves focus into it. No effect with touch (no D-pad key events).
-    val contentFocusRequester = remember { FocusRequester() }
+    // TV / D-pad: this requester points at the main action button (Install / Update / Launch). The
+    // TopAppBar doesn't release focus downward on its own, so "down" on the back arrow would otherwise
+    // leave the user stuck in the header; it now drops onto that button. No effect with touch.
+    val primaryActionFocusRequester = remember { FocusRequester() }
+    val isTelevision = LocalIsTelevision.current
+    // TV: open the detail with focus already on the main action instead of the back arrow, retrying
+    // briefly until the button is laid out. Keyed on the loaded app so it runs once per app. No-op on touch.
+    val successPackageName = successState?.app?.metadata?.packageName?.name
+    if (isTelevision) {
+        LaunchedEffect(successPackageName) {
+            if (successPackageName != null) {
+                repeat(20) {
+                    if (runCatching { primaryActionFocusRequester.requestFocus() }.isSuccess) return@LaunchedEffect
+                    delay(50)
+                }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -200,7 +215,7 @@ fun AppDetailScreen(
                 expandedHeight = AccentBarHeight,
                 modifier = Modifier.onPreviewKeyEvent { event ->
                     if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
-                        runCatching { contentFocusRequester.requestFocus() }.isSuccess
+                        runCatching { primaryActionFocusRequester.requestFocus() }.isSuccess
                     } else {
                         false
                     }
@@ -283,7 +298,7 @@ fun AppDetailScreen(
                         }
                     },
                     descriptionTranslation = descriptionTranslation,
-                    contentFocusRequester = contentFocusRequester,
+                    primaryActionFocusRequester = primaryActionFocusRequester,
                     modifier = Modifier.padding(padding),
                 )
             }
@@ -301,6 +316,7 @@ private fun PrimaryActions(
     onLaunch: () -> Unit,
     onUninstall: () -> Unit,
     onCancel: () -> Unit,
+    primaryActionFocusRequester: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
     val installing = installState == InstallState.Pending || installState == InstallState.Installing
@@ -308,7 +324,8 @@ private fun PrimaryActions(
     // TV focus for the action buttons: the button simply scales up (no drawn ring, which floated off a
     // Material button's elevated, larger-than-visible bounds). On TV the buttons are big and centred (not
     // stretched full-width), small enough that the focus zoom stays on screen; touch keeps the full-width
-    // buttons. A no-op on touch.
+    // buttons. The zoom is kept modest and the gap wide so a focused button doesn't grow into its
+    // neighbour. A no-op on touch.
     when {
         downloadStatus != null -> DownloadProgressRow(
             status = downloadStatus,
@@ -324,33 +341,38 @@ private fun PrimaryActions(
         else -> Row(
             modifier = modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(
-                8.dp,
+                if (isTelevision) 24.dp else 8.dp,
                 if (isTelevision) Alignment.CenterHorizontally else Alignment.Start,
             ),
         ) {
-            // Big and centred on TV; full-width (weight) on touch.
-            val tvPrimaryButton = if (isTelevision) Modifier.height(60.dp).widthIn(min = 340.dp) else Modifier.weight(1f)
+            // Big and centred on TV; full-width (weight) on touch. The primary action also holds the
+            // startup focus (see primaryActionFocusRequester).
+            val tvPrimaryButton = if (isTelevision) {
+                Modifier.height(60.dp).widthIn(min = 340.dp)
+            } else {
+                Modifier.weight(1f)
+            }.focusRequester(primaryActionFocusRequester)
             val tvSecondaryButton = if (isTelevision) Modifier.height(60.dp).widthIn(min = 200.dp) else Modifier
             when {
                 !isInstalled -> Button(
                     onClick = onInstallOrUpdate,
-                    modifier = tvPrimaryButton.tvFocusScale(),
+                    modifier = tvPrimaryButton.tvFocusScale(1.10f),
                 ) { Text(stringResource(R.string.install)) }
 
                 updateAvailable -> Button(
                     onClick = onInstallOrUpdate,
-                    modifier = tvPrimaryButton.tvFocusScale(),
+                    modifier = tvPrimaryButton.tvFocusScale(1.10f),
                 ) { Text(stringResource(R.string.update)) }
 
                 else -> Button(
                     onClick = onLaunch,
-                    modifier = tvPrimaryButton.tvFocusScale(),
+                    modifier = tvPrimaryButton.tvFocusScale(1.10f),
                 ) { Text(stringResource(R.string.launch)) }
             }
             if (isInstalled) {
                 OutlinedButton(
                     onClick = onUninstall,
-                    modifier = tvSecondaryButton.tvFocusScale(),
+                    modifier = tvSecondaryButton.tvFocusScale(1.10f),
                 ) {
                     Text(stringResource(R.string.uninstall))
                 }
@@ -377,7 +399,7 @@ private fun AppDetail(
     onCancel: () -> Unit,
     onCustomButtonClick: (url: String) -> Unit,
     descriptionTranslation: DescriptionTranslation,
-    contentFocusRequester: FocusRequester,
+    primaryActionFocusRequester: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
     val installedPackage = app.packages?.firstOrNull { it.installed }
@@ -395,9 +417,8 @@ private fun AppDetail(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            // Focus target for the header's D-pad "down" (TV): as a focus group it hands focus to the
-            // first focusable element (the action button), letting the remote leave the top bar.
-            .focusRequester(contentFocusRequester)
+            // A focus group so D-pad navigation stays scoped to the content (the action button itself is
+            // the explicit focus target, see primaryActionFocusRequester).
             .focusGroup()
             .then(modifier)
             // Breathing room so the header section isn't glued under the top bar.
@@ -420,6 +441,7 @@ private fun AppDetail(
             onLaunch = onLaunch,
             onUninstall = onUninstall,
             onCancel = onCancel,
+            primaryActionFocusRequester = primaryActionFocusRequester,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
 
