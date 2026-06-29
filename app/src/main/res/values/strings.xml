@@ -382,7 +382,7 @@
     <string name="external_repo_latest">Latest release: %1$s</string>
     <string name="external_latest_apk">Latest APK: %1$s</string>
     <string name="external_installed_version">Installed: %1$s</string>
-    <string name="external_preinstall_notice">Install the app to show its real name, icon and version — until then, these come from the repository.</string>
+    <string name="external_preinstall_notice">The name, icon and version shown are read from the repository. If any of them look wrong, install the app to use the real ones.</string>
     <string name="external_add_source">Add external source</string>
     <string name="install_failed_signature_mismatch">%1$s is already installed from a different source. Uninstall it first, then install this version.</string>
     <string name="signature_conflict_title">Uninstall required</string>

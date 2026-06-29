@@ -376,7 +376,7 @@
     <string name="external_repo_latest">Dernière release : %1$s</string>
     <string name="external_latest_apk">Dernier APK : %1$s</string>
     <string name="external_installed_version">Installé : %1$s</string>
-    <string name="external_preinstall_notice">Installez l\'app pour afficher son vrai nom, son icône et sa version — en attendant, ce sont ceux du dépôt.</string>
+    <string name="external_preinstall_notice">Le nom, l\'icône et la version affichés proviennent du dépôt. S\'ils s\'affichent mal, installez l\'app pour récupérer les vrais.</string>
     <string name="external_add_source">Ajouter une source externe</string>
     <string name="install_failed_signature_mismatch">%1$s est déjà installé depuis une autre source. Désinstallez-le d\'abord, puis installez cette version.</string>
     <string name="signature_conflict_title">Désinstallation nécessaire</string>
