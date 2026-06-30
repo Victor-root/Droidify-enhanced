@@ -285,6 +285,11 @@ fun AppListScreen(
     }
     // Disabled sources are hidden from the catalogue and updates, exactly like a disabled F-Droid repo.
     val enabledExternalApps = remember(externalApps) { externalApps.filter { it.enabled } }
+    // External sources whose repo manifest declares Android TV support — shown in the "Made for TV" row
+    // alongside the F-Droid TV apps (TV only).
+    val tvExternalApps = remember(enabledExternalApps) {
+        enabledExternalApps.filter { it.supportsTelevision }
+    }
     // "Track only" sources keep updating in the background but are kept out of the Updates tab/count.
     val externalUpdates = remember(enabledExternalApps) {
         enabledExternalApps.filter { it.hasUpdate && !it.muteUpdates }
@@ -494,9 +499,10 @@ fun AppListScreen(
                 item(span = { GridItemSpan(maxLineSpan) }, key = "discover-top-gap") {
                     Spacer(Modifier.height(12.dp))
                 }
-                // TV only: lead with apps actually built for the television (leanback launcher), so
-                // remote users find something usable first. Hidden on touch and when none are present.
-                if (isTelevision && tvApps.isNotEmpty()) {
+                // TV only: lead with apps actually built for the television (leanback launcher), both
+                // from the F-Droid catalogue and from tracked external sources. Hidden on touch and when
+                // none are present.
+                if (isTelevision && (tvApps.isNotEmpty() || tvExternalApps.isNotEmpty())) {
                     item(span = { GridItemSpan(maxLineSpan) }, key = "carousel-tv") {
                         DiscoverCarousel(
                             title = stringResource(R.string.discover_tv_apps),
@@ -505,6 +511,9 @@ fun AppListScreen(
                             onAppClick = openApp,
                             onSeeAll = { viewModel.openSection(SECTION_TV) },
                             modifier = Modifier.padding(bottom = 8.dp),
+                            externalApps = tvExternalApps,
+                            externalInstalledKeys = externalInstalledKeys,
+                            onExternalAppClick = openExternalApp,
                         )
                     }
                 }
@@ -623,6 +632,16 @@ fun AppListScreen(
                     sectionView -> openedSectionApps
                     isSearching -> apps
                     else -> emptyList()
+                }
+                // The "Made for TV" see-all page also lists the tracked external TV apps (TV only).
+                if (isTelevision && openedSection == SECTION_TV) {
+                    items(items = tvExternalApps, key = { "tv-ext-${it.key}" }) { app ->
+                        ExternalAppTile(
+                            app = app,
+                            isInstalled = app.key in externalInstalledKeys,
+                            onClick = { openExternalApp(app.key) },
+                        )
+                    }
                 }
                 items(
                     items = flatList,

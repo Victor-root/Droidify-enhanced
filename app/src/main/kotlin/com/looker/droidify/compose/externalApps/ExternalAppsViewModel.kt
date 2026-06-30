@@ -352,6 +352,8 @@ class ExternalAppsViewModel @Inject constructor(
                             label = resolvedLabel,
                             repoIconUrl = meta.iconCandidates.firstOrNull(),
                             iconChecked = true,
+                            supportsTelevision = meta.supportsTelevision,
+                            tvChecked = true,
                             latestTag = release.tag,
                             latestApkToken = release.apkVersionToken(filter = app.apkFilter),
                             latestApkName = release.apkFileName(filter = app.apkFilter),
@@ -423,9 +425,15 @@ class ExternalAppsViewModel @Inject constructor(
                 // existed. Gated by iconChecked so a repo is scanned at most once (a repo with only
                 // vector icons / no resolvable name must not be re-scanned every refresh — spares the
                 // API rate limit). Never overrides a user-picked icon or name.
-                val needsMeta = !app.iconChecked && !app.iconOverridden && app.repoIconUrl == null
+                val needsIcon = !app.iconChecked && !app.iconOverridden && app.repoIconUrl == null
+                // Backfill TV support for sources added before this existed, scanned at most once.
+                val needsTv = !app.tvChecked
+                val needsMeta = needsIcon || needsTv
                 val meta = if (needsMeta) externalApi.fetchRepoMetadata(app) else null
-                val repoIcon = meta?.iconCandidates?.firstOrNull() ?: app.repoIconUrl
+                // Only adopt a repo icon when we were actually looking for one — don't clobber a set or
+                // user-picked icon just because we re-scanned for TV support.
+                val repoIcon = if (needsIcon) meta?.iconCandidates?.firstOrNull() ?: app.repoIconUrl else app.repoIconUrl
+                val supportsTv = if (needsTv) meta?.supportsTelevision ?: app.supportsTelevision else app.supportsTelevision
                 // Only replace the label while it's still the bare repo name (never a user/on-device one).
                 val resolvedLabel = if (
                     meta?.appName != null &&
@@ -453,7 +461,9 @@ class ExternalAppsViewModel @Inject constructor(
                             latestApkToken = token,
                             latestApkName = apkName,
                             repoIconUrl = repoIcon,
-                            iconChecked = app.iconChecked || needsMeta,
+                            iconChecked = app.iconChecked || needsIcon,
+                            supportsTelevision = supportsTv,
+                            tvChecked = app.tvChecked || needsTv,
                         ),
                     )
                 }
