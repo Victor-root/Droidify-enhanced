@@ -374,6 +374,8 @@
     <string name="external_account_no_repos">Impossible de lister les dépôts de %1$s (ou limite d\'API atteinte)</string>
     <string name="external_account_no_apps">Aucune app avec une release APK trouvée pour %1$s</string>
     <string name="external_account_apps">%1$d apps</string>
+    <string name="external_account_disabled">désactivé</string>
+    <string name="external_account_scanning">recherche…</string>
     <string name="external_account_rescan">Rescanner</string>
     <string name="external_unreachable">Impossible de joindre %1$s</string>
     <string name="external_no_apk">La dernière release de %1$s ne contient pas d\'APK</string>

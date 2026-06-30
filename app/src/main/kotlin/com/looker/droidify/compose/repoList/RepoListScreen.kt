@@ -490,7 +490,7 @@ private fun ExternalSourceItem(
                 text = "${app.sourceLabel} · ${app.path}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -558,12 +558,19 @@ private fun ExternalAccountItem(
                 .alpha(contentAlpha),
         ) {
             Text(text = account.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // Subtitle: the app count once known; "disabled" while off (it isn't scanned until enabled);
+            // "searching…" during the first scan of a freshly-enabled account.
+            val status = when {
+                appCount > 0 -> stringResource(R.string.external_account_apps, appCount)
+                !account.enabled -> stringResource(R.string.external_account_disabled)
+                account.lastScan == 0L -> stringResource(R.string.external_account_scanning)
+                else -> stringResource(R.string.external_account_apps, 0)
+            }
             Text(
-                text = "${account.sourceLabel} · " +
-                    stringResource(R.string.external_account_apps, appCount),
+                text = "${account.sourceLabel} · $status",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }

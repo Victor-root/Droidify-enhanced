@@ -380,6 +380,8 @@
     <string name="external_account_no_repos">Couldn\'t list %1$s\'s repositories (or rate-limited)</string>
     <string name="external_account_no_apps">No app with an APK release found for %1$s</string>
     <string name="external_account_apps">%1$d apps</string>
+    <string name="external_account_disabled">disabled</string>
+    <string name="external_account_scanning">searching…</string>
     <string name="external_account_rescan">Rescan</string>
     <string name="external_unreachable">Couldn\'t reach %1$s</string>
     <string name="external_no_apk">The latest %1$s release has no APK</string>
