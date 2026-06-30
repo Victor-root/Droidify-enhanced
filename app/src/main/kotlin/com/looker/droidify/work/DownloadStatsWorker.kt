@@ -177,6 +177,10 @@ class DownloadStatsWorker @AssistedInject constructor(
         fun schedulePeriodic(context: Context) {
             val request = PeriodicWorkRequestBuilder<DownloadStatsWorker>(12, TimeUnit.HOURS)
                 .setConstraints(constraints)
+                // Delay the first periodic run so it doesn't fire immediately alongside the one-time
+                // fetch on first launch (two full 19-file stats passes at once spiked memory on low-RAM
+                // TVs). The one-time [fetchDownloadStats] populates stats now; the periodic refreshes later.
+                .setInitialDelay(12, TimeUnit.HOURS)
                 .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 UNIQUE_PERIODIC,
