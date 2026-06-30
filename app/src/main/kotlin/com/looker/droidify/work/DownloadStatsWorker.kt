@@ -148,6 +148,10 @@ class DownloadStatsWorker @AssistedInject constructor(
         private const val UNIQUE_ONE_TIME = "download_stats"
         private const val UNIQUE_PERIODIC = "download_stats_periodic"
 
+        /** Delay before the initial stats fetch, to keep it clear of the first-launch cold-start +
+         *  catalogue-sync window on slow devices. */
+        private const val STARTUP_FETCH_DELAY_SECONDS = 45L
+
         private val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
@@ -161,6 +165,11 @@ class DownloadStatsWorker @AssistedInject constructor(
                 ExistingWorkPolicy.KEEP,
                 OneTimeWorkRequestBuilder<DownloadStatsWorker>()
                     .setConstraints(constraints)
+                    // Hold off the initial run so it doesn't download + parse 19 JSON files while the
+                    // catalogue sync and the heavy first Compose frame are already fighting for the CPU on
+                    // first launch (that contention froze the main thread long enough to ANR on slow TVs).
+                    // Stats only feed the "Most downloaded" row, so a short wait is invisible.
+                    .setInitialDelay(STARTUP_FETCH_DELAY_SECONDS, TimeUnit.SECONDS)
                     .build(),
             )
         }
