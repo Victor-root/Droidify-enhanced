@@ -69,6 +69,18 @@ internal val DEFAULT_REPO_ICONS: Map<String, String> = mapOf(
         "https://fdroid.i2pd.xyz/fdroid/repo/icons/purplei2p.png",
     "https://fdroid.ironfoxoss.org/fdroid/repo" to
         "https://fdroid.ironfoxoss.org/fdroid/repo/icons/ironfox.png",
+    // These repos publish a QR code (or placeholder) as their repo icon, but each is a single-app repo,
+    // so we use that app's real icon instead. Fcitx5's own repo only holds plugins, so its logo comes
+    // from the main app on F-Droid. (Wind Project and Patched Apps are genuine multi-app collections
+    // with no single logo, so they keep the letter monogram.)
+    "https://fdroid.fedilab.app/repo" to
+        "https://fdroid.fedilab.app/repo/fr.gouv.etalab.mastodon/en-US/icon_2Jq-Bi5vXhNbP7Gd4VO4p77Ws9PviSLtxIt4aKMrAL0=.png",
+    "https://fdroid.cakelabs.com/fdroid/repo" to
+        "https://fdroid.cakelabs.com/fdroid/repo/com.cakewallet.cake_wallet/en-US/icon_bE9jI564FlPPouyY_mULU-3YXWTUqi1SqxxXjbBRCsE=.png",
+    "https://breezy-weather.github.io/fdroid-repo/fdroid/repo" to
+        "https://breezy-weather.github.io/fdroid-repo/fdroid/repo/org.breezyweather/en-US/icon_9s6OWodFUYb8-7w_fcaXpGLD1cw1YKEVneV4H1xpToI=.png",
+    "https://f5a.torus.icu/fdroid/repo" to
+        "https://f-droid.org/repo/org.fcitx.fcitx5.android/en-US/icon_oJHkpx5GsjyrG5_nxTfEs2FmP6g7_hmnbE6rKQjLRoI=.png",
     "https://brave-browser-apk-release.s3.brave.com/fdroid/repo" to
         "https://brave-browser-apk-release.s3.brave.com/fdroid/repo/icons/icon.png",
     "https://brave-browser-apk-beta.s3.brave.com/fdroid/repo" to
