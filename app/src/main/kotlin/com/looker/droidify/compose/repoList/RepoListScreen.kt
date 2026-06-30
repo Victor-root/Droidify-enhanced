@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,6 +30,7 @@ import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconToggleButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -301,8 +303,10 @@ private fun commonNamePrefix(names: List<String>): String {
     return prefix.joinToString(" ").ifEmpty { names.first() }
 }
 
-/** Renders one section's [groups]: a lone source as a plain [row]; a multi-source group as a
- *  collapsible header ("Name (count)") with its [row]s nested beneath when expanded. Expanded unless
+/** Renders one section's [groups]: a lone source as a plain flat [row]; a multi-source group as a
+ *  single boxed card (tinted, rounded) with a bold "Name (count)" header and its [row]s stacked inside,
+ *  separated by dividers. The card vs flat-row contrast is what makes a group read as its own category.
+ *  The whole group is one lazy item (repo lists are short, so nesting the rows is fine). Expanded unless
  *  the user collapsed it (tracked in [collapsedGroups] by a per-section key). */
 private fun <T> LazyListScope.groupedItems(
     sectionId: String,
@@ -320,44 +324,73 @@ private fun <T> LazyListScope.groupedItems(
             val stateKey = "$sectionId:${group.key}"
             val expanded = stateKey !in collapsedGroups
             item(key = "$sectionId-group-${group.key}") {
-                RepoGroupHeader(
+                RepoGroupCard(
                     title = group.title,
                     count = group.members.size,
                     expanded = expanded,
                     onClick = { onToggleGroup(stateKey) },
-                )
-            }
-            if (expanded) {
-                items(group.members, key = { keyOf(it) }) { item ->
-                    // Slight indent so grouped rows read as belonging to the header above them.
-                    Box(modifier = Modifier.padding(start = 12.dp)) { row(item) }
+                ) {
+                    group.members.forEachIndexed { index, member ->
+                        if (index > 0) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outlineVariant,
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                            )
+                        }
+                        row(member)
+                    }
                 }
             }
         }
     }
 }
 
-/** A collapsible group's header: its shared name + member count, with a chevron showing open/closed. */
+/** A group rendered as a contained card: a tinted, rounded box whose bold header ("Name (count)" +
+ *  open/closed chevron) toggles its [members]. The box makes the group visibly its own block, distinct
+ *  from the flat rows of ungrouped sources around it. */
 @Composable
-private fun RepoGroupHeader(title: String, count: Int, expanded: Boolean, onClick: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+private fun RepoGroupCard(
+    title: String,
+    count: Int,
+    expanded: Boolean,
+    onClick: () -> Unit,
+    members: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
-        Text(
-            text = "$title ($count)",
-            style = MaterialTheme.typography.titleMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        Icon(
-            imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-            contentDescription = null,
-        )
+        Column {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onClick)
+                    .padding(start = 16.dp, end = 12.dp, top = 14.dp, bottom = 14.dp),
+            ) {
+                Text(
+                    text = "$title ($count)",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    imageVector = if (expanded) {
+                        Icons.Default.KeyboardArrowUp
+                    } else {
+                        Icons.Default.KeyboardArrowDown
+                    },
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+            if (expanded) members()
+        }
     }
 }
 
