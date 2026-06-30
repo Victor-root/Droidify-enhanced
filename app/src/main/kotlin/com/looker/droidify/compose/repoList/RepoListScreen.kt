@@ -602,34 +602,37 @@ private fun RepoIcon(
     iconUrl: String?,
     fallbackUrl: String?,
     name: String,
-    enabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val shape = MaterialTheme.shapes.large
     // Prefer the synced icon (freshest); for the many default repos that ship disabled and were never
     // synced, fall back to the hardcoded logo. Only the letter monogram remains if neither is available
-    // or the chosen image fails to load.
+    // or the chosen image fails to load. Logos are always shown in full colour (no greyscale/dim): the
+    // toggle already signals the on/off state, and most default repos are disabled, so dimming them all
+    // made the whole list look faded.
     val url = iconUrl?.takeIf { it.isNotBlank() } ?: fallbackUrl
     var failed by remember(url) { mutableStateOf(false) }
-    Box(modifier = modifier.clip(shape), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = modifier.clip(shape),
+        contentAlignment = Alignment.Center,
+    ) {
         if (!url.isNullOrBlank() && !failed) {
             AsyncImage(
                 model = url,
                 contentDescription = null,
-                colorFilter = if (enabled) null else GrayScaleColorFilter,
                 onError = { failed = true },
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
-            MonogramAvatar(name = name, enabled = enabled)
+            MonogramAvatar(name = name)
         }
     }
 }
 
 /** The fallback avatar: the name's first letter on a theme container colour, picked deterministically
- *  from the letter so a given repo keeps a stable colour. */
+ *  from the letter so a given repo keeps a stable colour. The caller handles any disabled dimming. */
 @Composable
-private fun MonogramAvatar(name: String, enabled: Boolean) {
+private fun MonogramAvatar(name: String) {
     val letter = letterOf(name)
     val palette = listOf(
         MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer,
@@ -640,8 +643,7 @@ private fun MonogramAvatar(name: String, enabled: Boolean) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(background)
-            .alpha(if (enabled) 1f else 0.4f),
+            .background(background),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -681,7 +683,6 @@ private fun RepoItem(
             iconUrl = repo.icon?.path,
             fallbackUrl = defaultRepoIcon(repo.address),
             name = repo.name,
-            enabled = repo.enabled,
             modifier = Modifier.size(48.dp),
         )
         Spacer(modifier = Modifier.size(16.dp))

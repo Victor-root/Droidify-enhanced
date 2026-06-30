@@ -6,10 +6,10 @@ package com.looker.droidify.compose.repoList
  * gives the repositories list a real, recognizable logo before the user enables anything.
  *
  * Each URL is the icon the repo itself declares in its index (`<address>/icons/<name>`), confirmed to
- * return a real image. Repos that only publish the generic F-Droid placeholder (several share the exact
- * same default file) are deliberately left out: they fall back to the letter monogram, which is more
- * distinctive than the generic robot. Keys are matched against [com.looker.droidify.data.model.Repo]'s
- * address with any trailing slash trimmed.
+ * be a real logo. Repos whose declared icon is only the generic F-Droid placeholder (several share the
+ * exact same default file) or a QR code of their address (a pure two-colour image, useless as a logo)
+ * are deliberately left out: they fall back to the letter monogram, which is more distinctive. Keys are
+ * matched against [com.looker.droidify.data.model.Repo]'s address with any trailing slash trimmed.
  */
 internal val DEFAULT_REPO_ICONS: Map<String, String> = mapOf(
     "https://f-droid.org/repo" to
@@ -39,18 +39,12 @@ internal val DEFAULT_REPO_ICONS: Map<String, String> = mapOf(
         "https://cdn.kde.org/android/stable-releases/fdroid/repo/icons/kde.png",
     "https://calyxos.gitlab.io/calyx-fdroid-repo/fdroid/repo" to
         "https://calyxos.gitlab.io/calyx-fdroid-repo/fdroid/repo/icons/fdroid-icon.png",
-    "https://fdroid.fedilab.app/repo" to
-        "https://fdroid.fedilab.app/repo/icons/icon.png",
     "https://store.nethunter.com/repo" to
         "https://store.nethunter.com/repo/icons/nethunter-git-logo.png",
-    "https://thecapslock.gitlab.io/fdroid-patched-apps/fdroid/repo" to
-        "https://thecapslock.gitlab.io/fdroid-patched-apps/fdroid/repo/icons/icon.png",
     "https://mobileapp.bitwarden.com/fdroid/repo" to
         "https://mobileapp.bitwarden.com/fdroid/repo/icons/icon.png",
     "https://briarproject.org/fdroid/repo" to
         "https://briarproject.org/fdroid/repo/icons/briar-icon.png",
-    "https://guardianproject-wind.s3.amazonaws.com/fdroid/repo" to
-        "https://guardianproject-wind.s3.amazonaws.com/fdroid/repo/icons/icon.png",
     "https://releases.threema.ch/fdroid/repo" to
         "https://releases.threema.ch/fdroid/repo/icons/repo-icon.png",
     "https://fdroid.getsession.org/fdroid/repo" to
@@ -69,12 +63,8 @@ internal val DEFAULT_REPO_ICONS: Map<String, String> = mapOf(
         "https://app.futo.org/fdroid/repo/icons/FUTO.png",
     "https://fdroid.mm20.de/repo" to
         "https://fdroid.mm20.de/repo/icons/icon.png",
-    "https://breezy-weather.github.io/fdroid-repo/fdroid/repo" to
-        "https://breezy-weather.github.io/fdroid-repo/fdroid/repo/icons/icon.png",
     "https://gh.artemchep.com/keyguard-repo-fdroid/repo" to
         "https://gh.artemchep.com/keyguard-repo-fdroid/repo/icons/icon.png",
-    "https://f5a.torus.icu/fdroid/repo" to
-        "https://f5a.torus.icu/fdroid/repo/icons/icon.png",
     "https://fdroid.i2pd.xyz/fdroid/repo" to
         "https://fdroid.i2pd.xyz/fdroid/repo/icons/purplei2p.png",
     "https://fdroid.ironfoxoss.org/fdroid/repo" to
