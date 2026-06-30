@@ -8,27 +8,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,7 +28,6 @@ import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconToggleButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,11 +41,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.focusGroup
@@ -66,9 +55,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -86,8 +73,6 @@ import com.looker.droidify.data.model.Repo
 import com.looker.droidify.external.ExternalApp
 import com.looker.droidify.utility.text.toAnnotatedString
 import com.looker.droidify.compose.theme.AccentBarHeight
-import com.looker.droidify.compose.theme.LocalIsTelevision
-import kotlinx.coroutines.launch
 import com.looker.droidify.compose.theme.accentTopAppBarColors
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -116,53 +101,14 @@ fun RepoListScreen(
     var showAddExternal by rememberSaveable { mutableStateOf(false) }
     var editingExternal by remember { mutableStateOf<ExternalApp?>(null) }
 
-    // Group sources whose names start the same way (e.g. "Brave Release" / "Brave Beta" / "Brave
-    // Nightly" -> one "Brave (3)" group) so several sources for the same thing read as one entry. A
-    // source with no sibling stays a plain row. Each section is sorted alphabetically by the entry's
-    // display name (a group sorts by its shared name), so the list reads A->Z and the letter rail can
-    // jump into it. Recomputed only when the underlying lists change.
-    val externalGroups = remember(externalApps) {
-        groupByName(externalApps) { it.label }.sortedBy { it.title.trim().lowercase() }
+    // Each section lists its sources one after another, sorted alphabetically by display name. Now that
+    // every repo has a real logo (or a letter monogram), the icons make scanning easy without grouping.
+    val sortedExternalApps = remember(externalApps) {
+        externalApps.sortedBy { it.label.trim().lowercase() }
     }
-    val repoGroups = remember(repos) {
-        groupByName(repos) { it.name }.sortedBy { it.title.trim().lowercase() }
+    val sortedRepos = remember(repos) {
+        repos.sortedBy { it.name.trim().lowercase() }
     }
-    // Groups are shown expanded by default (nothing is hidden); this tracks the ones the user collapsed
-    // to tidy the list. Keyed per section so an "ext" group and an "repo" group can't clash.
-    var collapsedGroups by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }
-    val toggleGroup: (String) -> Unit = { key ->
-        collapsedGroups = if (key in collapsedGroups) collapsedGroups - key else collapsedGroups + key
-    }
-
-    // The whole screen as one flat, ordered list of rows (headers, single sources, group cards). Built
-    // once so it's the single source of truth for both rendering and the letter rail: because every row
-    // is exactly one lazy item, a row's position in this list *is* its scroll index.
-    val externalTitle = stringResource(R.string.tab_external)
-    val fdroidTitle = stringResource(R.string.repo_section_fdroid)
-    val externalHint = stringResource(R.string.external_empty_hint)
-    val rows = remember(externalGroups, repoGroups, externalTitle, fdroidTitle, externalHint) {
-        buildRepoRows(externalGroups, repoGroups, externalTitle, fdroidTitle, externalHint)
-    }
-    // First row index for each starting letter, used by the rail to jump there. First-seen wins, so a
-    // letter present in both sections lands on the (earlier) External one.
-    val letterTargets = remember(rows) {
-        buildMap { rows.forEachIndexed { index, row -> row.letter?.let { putIfAbsent(it, index) } } }
-    }
-    val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-    // Tapping a letter jumps to its first entry; a letter with no entry jumps to the next letter that
-    // has one (so the rail always scrolls somewhere sensible).
-    val scrollToLetter: (Char) -> Unit = { letter ->
-        val target = letterTargets[letter]
-            ?: ('A'..'Z').filter { it > letter }.firstNotNullOfOrNull { letterTargets[it] }
-            ?: letterTargets.values.maxOrNull()
-        if (target != null) scope.launch { listState.scrollToItem(target) }
-    }
-
-    // The letter rail is a touch affordance, so it's shown only off TV (D-pad navigates the list there)
-    // and only when the list is long enough to be worth fast-scrolling.
-    val isTelevision = LocalIsTelevision.current
-    val showLetterRail = !isTelevision && rows.count { it.letter != null } >= LETTER_RAIL_MIN_ENTRIES
 
     // TV / D-pad: the top bar doesn't release focus downward on its own; this lets "down" drop from the
     // header into the list. No effect on touch.
@@ -200,90 +146,43 @@ fun RepoListScreen(
             }
         },
     ) { contentPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            LazyColumn(
-                state = listState,
-                contentPadding = contentPadding,
-                modifier = Modifier
-                    .fillMaxSize()
-                    // Reserve the right gutter for the letter rail so rows (and their toggles) never
-                    // sit under it.
-                    .then(if (showLetterRail) Modifier.padding(end = LetterRailWidth) else Modifier)
-                    .focusRequester(contentFocusRequester)
-                    .focusGroup(),
-            ) {
-                items(rows, key = { it.key }) { row ->
-                    when (row) {
-                        is SectionHeaderRow -> SectionHeader(title = row.title)
-
-                        is HintRow -> Text(
-                            text = row.text,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(16.dp),
-                        )
-
-                        is ExternalRow -> ExternalSourceItem(
-                            app = row.app,
-                            isInstalled = row.app.key in externalInstalledKeys,
-                            onToggle = { externalViewModel.setSourceEnabled(row.app, !row.app.enabled) },
-                            onEdit = { editingExternal = row.app },
-                            onRemove = { externalViewModel.remove(row.app.key) },
-                        )
-
-                        is ExternalGroupRow -> RepoGroupCard(
-                            title = row.title,
-                            count = row.members.size,
-                            expanded = row.stateKey !in collapsedGroups,
-                            onClick = { toggleGroup(row.stateKey) },
-                        ) {
-                            row.members.forEachIndexed { index, app ->
-                                if (index > 0) GroupMemberDivider()
-                                ExternalSourceItem(
-                                    app = app,
-                                    isInstalled = app.key in externalInstalledKeys,
-                                    onToggle = { externalViewModel.setSourceEnabled(app, !app.enabled) },
-                                    onEdit = { editingExternal = app },
-                                    onRemove = { externalViewModel.remove(app.key) },
-                                )
-                            }
-                        }
-
-                        is FdroidRow -> RepoItem(
-                            onClick = { onRepoClick(row.repo.id) },
-                            onToggle = { viewModel.toggleRepo(row.repo) },
-                            repo = row.repo,
-                        )
-
-                        is FdroidGroupRow -> RepoGroupCard(
-                            title = row.title,
-                            count = row.members.size,
-                            expanded = row.stateKey !in collapsedGroups,
-                            onClick = { toggleGroup(row.stateKey) },
-                        ) {
-                            row.members.forEachIndexed { index, repo ->
-                                if (index > 0) GroupMemberDivider()
-                                RepoItem(
-                                    onClick = { onRepoClick(repo.id) },
-                                    onToggle = { viewModel.toggleRepo(repo) },
-                                    repo = repo,
-                                )
-                            }
-                        }
-                    }
+        LazyColumn(
+            contentPadding = contentPadding,
+            modifier = Modifier
+                .focusRequester(contentFocusRequester)
+                .focusGroup(),
+        ) {
+            item(key = "external-header") {
+                SectionHeader(title = stringResource(R.string.tab_external))
+            }
+            if (sortedExternalApps.isEmpty()) {
+                item(key = "external-empty") {
+                    Text(
+                        text = stringResource(R.string.external_empty_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(16.dp),
+                    )
                 }
             }
-            if (showLetterRail) {
-                LetterRail(
-                    onLetter = scrollToLetter,
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .fillMaxHeight()
-                        .width(LetterRailWidth)
-                        .padding(
-                            top = contentPadding.calculateTopPadding(),
-                            bottom = contentPadding.calculateBottomPadding(),
-                        ),
+            items(sortedExternalApps, key = { "ext-${it.key}" }) { app ->
+                ExternalSourceItem(
+                    app = app,
+                    isInstalled = app.key in externalInstalledKeys,
+                    onToggle = { externalViewModel.setSourceEnabled(app, !app.enabled) },
+                    onEdit = { editingExternal = app },
+                    onRemove = { externalViewModel.remove(app.key) },
+                )
+            }
+
+            item(key = "repos-header") {
+                SectionHeader(title = stringResource(R.string.repo_section_fdroid))
+            }
+            items(sortedRepos, key = { "repo-${it.id}" }) { repo ->
+                RepoItem(
+                    onClick = { onRepoClick(repo.id) },
+                    onToggle = { viewModel.toggleRepo(repo) },
+                    repo = repo,
                 )
             }
         }
@@ -353,250 +252,16 @@ fun RepoListScreen(
     }
 }
 
-/** A set of sources whose names share a leading word, shown together under one collapsible header. */
-private data class NameGroup<T>(val key: String, val title: String, val members: List<T>)
-
-private val WHITESPACE = Regex("\\s+")
-
-/** Buckets [items] by the first word of their name (case-insensitive), preserving first-seen order.
- *  A bucket with several members becomes a group titled by the words its names share (e.g. "Brave" or
- *  "Brave Browser"); a lone member keeps its full name. */
-private fun <T> groupByName(items: List<T>, name: (T) -> String): List<NameGroup<T>> {
-    val buckets = LinkedHashMap<String, MutableList<T>>()
-    for (item in items) {
-        val firstWord = name(item).trim().split(WHITESPACE).firstOrNull { it.isNotEmpty() }.orEmpty()
-        buckets.getOrPut(firstWord.lowercase()) { mutableListOf() }.add(item)
-    }
-    return buckets.map { (key, members) ->
-        val sorted = members.sortedBy { name(it).trim().lowercase() }
-        val title = if (sorted.size >= 2) commonNamePrefix(sorted.map(name)) else name(sorted.first())
-        NameGroup(key, title, sorted)
-    }
-}
-
-/** The leading words shared by every name (e.g. ["Brave Release", "Brave Beta"] -> "Brave"), falling
- *  back to the first name if there's no shared word. */
-private fun commonNamePrefix(names: List<String>): String {
-    val tokens = names.map { it.trim().split(WHITESPACE).filter(String::isNotEmpty) }
-    val minLen = tokens.minOf { it.size }
-    val prefix = mutableListOf<String>()
-    for (i in 0 until minLen) {
-        val word = tokens.first()[i]
-        if (tokens.all { it[i].equals(word, ignoreCase = true) }) prefix += word else break
-    }
-    return prefix.joinToString(" ").ifEmpty { names.first() }
-}
-
-/** One rendered line of the repositories screen. [letter] is the starting letter the alphabet rail
- *  jumps to (null for rows that aren't scroll targets, i.e. section headers and the empty hint). */
-private sealed interface RepoListRow {
-    val key: Any
-    val letter: Char?
-}
-
-private data class SectionHeaderRow(val title: String, override val key: Any) : RepoListRow {
-    override val letter: Char? get() = null
-}
-
-private data class HintRow(override val key: Any, val text: String) : RepoListRow {
-    override val letter: Char? get() = null
-}
-
-private data class ExternalRow(val app: ExternalApp) : RepoListRow {
-    override val key: Any = "ext-${app.key}"
-    override val letter: Char = letterOf(app.label)
-}
-
-private data class ExternalGroupRow(
-    val title: String,
-    val members: List<ExternalApp>,
-    val stateKey: String,
-    override val key: Any,
-) : RepoListRow {
-    override val letter: Char = letterOf(title)
-}
-
-private data class FdroidRow(val repo: Repo) : RepoListRow {
-    override val key: Any = "repo-${repo.id}"
-    override val letter: Char = letterOf(repo.name)
-}
-
-private data class FdroidGroupRow(
-    val title: String,
-    val members: List<Repo>,
-    val stateKey: String,
-    override val key: Any,
-) : RepoListRow {
-    override val letter: Char = letterOf(title)
-}
-
-/** Flattens both sections into the ordered row list rendered by the screen: a header, then each
- *  section's entries (a lone source as a single row, a multi-source bucket as a group row). */
-private fun buildRepoRows(
-    externalGroups: List<NameGroup<ExternalApp>>,
-    repoGroups: List<NameGroup<Repo>>,
-    externalTitle: String,
-    fdroidTitle: String,
-    externalHint: String,
-): List<RepoListRow> = buildList {
-    add(SectionHeaderRow(externalTitle, "external-header"))
-    if (externalGroups.isEmpty()) add(HintRow("external-empty", externalHint))
-    for (group in externalGroups) {
-        if (group.members.size < 2) {
-            add(ExternalRow(group.members.first()))
-        } else {
-            add(ExternalGroupRow(group.title, group.members, "ext:${group.key}", "ext-group-${group.key}"))
-        }
-    }
-    add(SectionHeaderRow(fdroidTitle, "repos-header"))
-    for (group in repoGroups) {
-        if (group.members.size < 2) {
-            add(FdroidRow(group.members.first()))
-        } else {
-            add(FdroidGroupRow(group.title, group.members, "repo:${group.key}", "repo-group-${group.key}"))
-        }
-    }
-}
-
-/** The uppercase first letter (or digit) of a name for the alphabet rail; non-alphanumeric starts (and
- *  digits) fold to '#'. */
+/** The uppercase first letter (or digit) of a name for the monogram avatar; non-alphanumeric starts
+ *  (and anything past Z) fold to '#'. */
 private fun letterOf(name: String): Char {
     val first = name.trim().firstOrNull { it.isLetterOrDigit() }?.uppercaseChar() ?: return '#'
     return if (first in 'A'..'Z') first else '#'
 }
 
-/** Thin separator between the stacked rows inside a group card. */
-@Composable
-private fun GroupMemberDivider() {
-    HorizontalDivider(
-        color = MaterialTheme.colorScheme.outlineVariant,
-        modifier = Modifier.padding(horizontal = 16.dp),
-    )
-}
-
-/** A group rendered as a contained card: a tinted, rounded box whose bold header ("Name (count)" +
- *  open/closed chevron) toggles its [members]. The box makes the group visibly its own block, distinct
- *  from the flat rows of ungrouped sources around it. */
-@Composable
-private fun RepoGroupCard(
-    title: String,
-    count: Int,
-    expanded: Boolean,
-    onClick: () -> Unit,
-    members: @Composable ColumnScope.() -> Unit,
-) {
-    Surface(
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-    ) {
-        Column {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onClick)
-                    .padding(start = 16.dp, end = 12.dp, top = 14.dp, bottom = 14.dp),
-            ) {
-                Text(
-                    text = "$title ($count)",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                Icon(
-                    imageVector = if (expanded) {
-                        Icons.Default.KeyboardArrowUp
-                    } else {
-                        Icons.Default.KeyboardArrowDown
-                    },
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
-            if (expanded) members()
-        }
-    }
-}
-
-/** Width of the right-edge alphabet rail (and the gutter the list reserves for it). */
-private val LetterRailWidth = 28.dp
-
-/** Only show the rail once the list is long enough that fast-scrolling actually helps. */
-private const val LETTER_RAIL_MIN_ENTRIES = 12
-
-private val RAIL_LETTERS = ('A'..'Z').toList()
-
-/** A right-edge A-Z rail (contacts-style): tap or drag a letter to jump the list to the first entry
- *  starting with it. Touch only; the caller hides it on TV. The active letter is tinted with the
- *  app accent so the current target is clear while dragging. */
-@Composable
-private fun LetterRail(onLetter: (Char) -> Unit, modifier: Modifier = Modifier) {
-    var heightPx by remember { mutableIntStateOf(0) }
-    var active by remember { mutableStateOf<Char?>(null) }
-    Surface(
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.7f),
-        modifier = modifier,
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceEvenly,
-            modifier = Modifier
-                .fillMaxHeight()
-                .padding(horizontal = 4.dp, vertical = 8.dp)
-                .onSizeChanged { heightPx = it.height }
-                .pointerInput(Unit) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown()
-                        railLetterAt(down.position.y, heightPx)?.let {
-                            active = it
-                            onLetter(it)
-                        }
-                        do {
-                            val event = awaitPointerEvent()
-                            event.changes.firstOrNull()?.position?.let { pos ->
-                                railLetterAt(pos.y, heightPx)?.let {
-                                    if (it != active) {
-                                        active = it
-                                        onLetter(it)
-                                    }
-                                }
-                            }
-                        } while (event.changes.any { it.pressed })
-                        active = null
-                    }
-                },
-        ) {
-            RAIL_LETTERS.forEach { letter ->
-                Text(
-                    text = letter.toString(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (letter == active) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-            }
-        }
-    }
-}
-
-/** Maps a vertical touch position on the rail to its letter. */
-private fun railLetterAt(y: Float, heightPx: Int): Char? {
-    if (heightPx <= 0) return null
-    val index = (y / heightPx * RAIL_LETTERS.size).toInt().coerceIn(0, RAIL_LETTERS.lastIndex)
-    return RAIL_LETTERS[index]
-}
-
 /** A repo's icon: the synced repo icon when it loads, otherwise a themed letter monogram (a tinted,
  *  rounded tile with the repo's first letter) so every repo has a distinct, recognizable avatar even
- *  when its index ships no icon. Disabled repos are dimmed/greyed like before. */
+ *  when its index ships no icon. */
 @Composable
 private fun RepoIcon(
     iconUrl: String?,
