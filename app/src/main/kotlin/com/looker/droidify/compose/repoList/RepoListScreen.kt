@@ -1,5 +1,6 @@
 package com.looker.droidify.compose.repoList
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
