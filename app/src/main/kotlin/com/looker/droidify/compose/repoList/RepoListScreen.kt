@@ -53,8 +53,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -263,7 +261,7 @@ private fun letterOf(name: String): Char {
  *  rounded tile with the repo's first letter) so every repo has a distinct, recognizable avatar even
  *  when its index ships no icon. */
 @Composable
-private fun RepoIcon(
+internal fun RepoIcon(
     iconUrl: String?,
     fallbackUrl: String?,
     name: String,
@@ -770,5 +768,3 @@ private fun CheckboxRow(checked: Boolean, onCheckedChange: (Boolean) -> Unit, la
         Text(text = label, style = MaterialTheme.typography.bodyMedium)
     }
 }
-
-val GrayScaleColorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
