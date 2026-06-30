@@ -20,6 +20,10 @@ data class ExternalAccount(
     val label: String = owner,
     /** Active state. Disabling the account disables all of its discovered apps too. */
     val enabled: Boolean = true,
+    /** Whether forked repos are included in the discovery. Off by default (forks are usually noise), but
+     *  some accounts publish their apps as forks of upstream projects, so it's a per-account choice.
+     *  No effect on GitLab, whose project list doesn't flag forks. */
+    val includeForks: Boolean = false,
     /** Epoch millis of the last repo-list scan (0 = never), driving the once-a-day auto rescan that
      *  picks up newly published apps. */
     val lastScan: Long = 0,
@@ -49,4 +53,10 @@ data class ExternalAccount(
             provider == SourceProvider.GITHUB && host.isEmpty() -> "https://github.com/$owner.png"
             else -> null
         }
+
+    companion object {
+        /** Key of the built-in Omnify source (the developer's GitHub account), seeded on first run and
+         *  shown with the app's own logo. */
+        const val OMNIFY_KEY = "GITHUB/Victor-root"
+    }
 }

@@ -366,15 +366,17 @@ class ExternalApi @Inject constructor(
     }
 
     /**
-     * Lists the repos of a whole account [owner] (a user or org) on [provider]/[host], skipping only
-     * archived repos (forks are kept on purpose: a fork that ships an APK release is a real app). Used by
-     * the account-source feature; the caller then keeps only the repos that actually ship an installable
-     * APK release. Paged, with a bounded page count. Never throws.
+     * Lists the repos of a whole account [owner] (a user or org) on [provider]/[host], always skipping
+     * archived repos and, unless [includeForks], forks too. Used by the account-source feature; the
+     * caller then keeps only the repos that actually ship an installable APK release. Forks can't be
+     * detected on GitLab (its project list doesn't flag them), so [includeForks] has no effect there.
+     * Paged, with a bounded page count. Never throws.
      */
     suspend fun listAccountRepos(
         provider: SourceProvider,
         host: String,
         owner: String,
+        includeForks: Boolean,
     ): List<RepoRef> = withContext(Dispatchers.IO) {
         runCatching {
             when (provider) {
@@ -384,14 +386,14 @@ class ExternalApi @Inject constructor(
                             "?per_page=100&page=$page&type=owner&sort=pushed",
                         github = true,
                     ) ?: return@pagedAccountRepos PageResult(emptyList(), 0)
-                    giteaPage(text, owner)
+                    giteaPage(text, owner, includeForks)
                 }
 
                 SourceProvider.CODEBERG -> pagedAccountRepos { page ->
                     val text = getText(
                         url = "https://$host/api/v1/users/$owner/repos?limit=50&page=$page",
                     ) ?: return@pagedAccountRepos PageResult(emptyList(), 0)
-                    giteaPage(text, owner)
+                    giteaPage(text, owner, includeForks)
                 }
 
                 SourceProvider.GITLAB -> {
@@ -429,13 +431,12 @@ class ExternalApi @Inject constructor(
         return all
     }
 
-    private fun giteaPage(text: String, fallbackOwner: String): PageResult {
+    private fun giteaPage(text: String, fallbackOwner: String, includeForks: Boolean): PageResult {
         val dtos = json.decodeFromString(ListSerializer(GiteaRepoDto.serializer()), text)
-        // Forks are kept on purpose: users often fork an app and publish their own builds (that's the
-        // whole point of this client), so a fork that ships an APK release is a real app. Only archived
-        // repos (explicitly retired by the owner) are skipped; the release-APK check below is the real
-        // filter.
-        val refs = dtos.filterNot { it.archived }
+        // Archived repos (explicitly retired by the owner) are always skipped; forks are skipped unless
+        // the user opted to include them (some publish their apps as forks of upstream projects). The
+        // release-APK check by the caller is the final filter.
+        val refs = dtos.filterNot { it.archived || (!includeForks && it.fork) }
             .map { RepoRef(it.owner.login.ifEmpty { fallbackOwner }, it.name) }
         return PageResult(refs, dtos.size)
     }

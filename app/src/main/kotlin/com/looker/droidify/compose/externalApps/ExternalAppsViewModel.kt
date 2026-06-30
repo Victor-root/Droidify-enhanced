@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -61,6 +62,32 @@ class ExternalAppsViewModel @Inject constructor(
 
     /** Tracked whole-account sources (each expands to several entries in [apps]). */
     val accounts: StateFlow<List<ExternalAccount>> = repository.accounts.asStateFlow(emptyList())
+
+    /** Account keys whose discovery is currently running, so the watcher below never launches a second
+     *  scan for the same account. */
+    private val scanningAccounts = MutableStateFlow<Set<String>>(emptySet())
+
+    init {
+        // Discover the apps of any account that has never been scanned (lastScan == 0) as soon as it
+        // appears (the built-in Omnify account seeded on first run, or one added programmatically)
+        // without waiting for the throttled refresh, so its apps show up promptly. A manually added
+        // account is already scanned at add time (lastScan set), so it's skipped here.
+        viewModelScope.launch {
+            repository.accounts.collect { list ->
+                list.forEach { account ->
+                    if (account.lastScan != 0L || account.key in scanningAccounts.value) return@forEach
+                    scanningAccounts.update { it + account.key }
+                    launch {
+                        try {
+                            rescanAccountNow(account)
+                        } finally {
+                            scanningAccounts.update { it - account.key }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     /** Bumped to re-query the package manager (e.g. when the screen is reopened). */
     private val installedRefresh = MutableStateFlow(0)
@@ -291,14 +318,7 @@ class ExternalAppsViewModel @Inject constructor(
     ) {
         val ref = parseExternalSource(url)
         if (ref == null) {
-            // Not an owner/repo URL: maybe it's a whole account (owner only) -> add it as an account
-            // source that expands to every one of the account's apps.
-            val accountRef = parseAccountSource(url)
-            if (accountRef != null) {
-                addAccountSource(accountRef, customName, includePrereleases, muteUpdates, apkFilter)
-            } else {
-                snack(context.getString(R.string.external_invalid_url))
-            }
+            snack(context.getString(R.string.external_invalid_url))
             return
         }
         val trimmedName = customName.trim()
@@ -386,14 +406,35 @@ class ExternalAppsViewModel @Inject constructor(
     }
 
     /**
+     * Adds a whole-account source from a pasted account URL (owner only). See [addAccountSource].
+     */
+    fun addAccount(
+        url: String,
+        customName: String,
+        includeForks: Boolean,
+        includePrereleases: Boolean,
+        muteUpdates: Boolean,
+        apkFilter: String,
+    ) {
+        val ref = parseAccountSource(url)
+        if (ref == null) {
+            snack(context.getString(R.string.external_invalid_url))
+            return
+        }
+        addAccountSource(ref, customName, includeForks, includePrereleases, muteUpdates, apkFilter)
+    }
+
+    /**
      * Adds a whole-account source: discovers the account's repos that ship an installable APK release
      * and tracks each as its own [ExternalApp] tagged with the account, while the account itself is one
-     * row in the sources list. The dialog options ([includePrereleases]/[muteUpdates]/[apkFilter]) become
-     * the defaults applied to every discovered app; [label] (if any) names the account.
+     * row in the sources list. The dialog options ([includeForks]/[includePrereleases]/[muteUpdates]/
+     * [apkFilter]) drive the discovery and become the defaults applied to every discovered app;
+     * [label] (if any) names the account.
      */
     private fun addAccountSource(
         ref: ExternalAccountRef,
         label: String,
+        includeForks: Boolean,
         includePrereleases: Boolean,
         muteUpdates: Boolean,
         apkFilter: String,
@@ -412,7 +453,7 @@ class ExternalAppsViewModel @Inject constructor(
                 var repos: List<RepoRef> = emptyList()
                 for (candidate in candidates) {
                     val host = ref.host.ifEmpty { publicHost(candidate) }
-                    val listed = externalApi.listAccountRepos(candidate, host, ref.owner)
+                    val listed = externalApi.listAccountRepos(candidate, host, ref.owner, includeForks)
                     if (listed.isNotEmpty()) {
                         provider = candidate
                         repos = listed
@@ -437,6 +478,7 @@ class ExternalAppsViewModel @Inject constructor(
                     host = ref.host,
                     label = trimmedName.ifEmpty { ref.owner },
                     enabled = true,
+                    includeForks = includeForks,
                     lastScan = System.currentTimeMillis(),
                 )
                 if (accounts.value.any { it.key == account.key }) {
@@ -532,7 +574,12 @@ class ExternalAppsViewModel @Inject constructor(
 
     private suspend fun rescanAccountNow(account: ExternalAccount) {
         val host = account.host.ifEmpty { publicHost(account.provider) }
-        val repos = externalApi.listAccountRepos(account.provider, host, account.owner)
+        val repos = externalApi.listAccountRepos(
+            account.provider,
+            host,
+            account.owner,
+            account.includeForks,
+        )
         // Bump the last-scan time even when the listing fails/empties, so a transient failure doesn't make
         // every refresh hammer the API; a real new app shows up at the next daily scan.
         if (repos.isNotEmpty()) {
