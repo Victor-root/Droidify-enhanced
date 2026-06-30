@@ -5,11 +5,12 @@ package com.looker.droidify.compose.repoList
  * slash). Most default repos ship disabled, so they're never synced and we hold no icon for them; this
  * gives the repositories list a real, recognizable logo before the user enables anything.
  *
- * Each URL is the icon the repo itself declares in its index (`<address>/icons/<name>`), confirmed to
- * be a real logo. Repos whose declared icon is only the generic F-Droid placeholder (several share the
- * exact same default file) or a QR code of their address (a pure two-colour image, useless as a logo)
- * are deliberately left out: they fall back to the letter monogram, which is more distinctive. Keys are
- * matched against [com.looker.droidify.data.model.Repo]'s address with any trailing slash trimmed.
+ * Each URL is a real logo, confirmed to be an actual image: usually the icon the repo declares in its
+ * index (`<address>/icons/<name>`), or, when that's only the generic F-Droid placeholder or a QR code of
+ * the address, the repo's flagship app icon instead. Repos that ship neither (no usable repo icon and no
+ * single representative app, e.g. multi-app collections) are left out and fall back to the letter
+ * monogram. Keys are matched against [com.looker.droidify.data.model.Repo]'s address, trailing slash
+ * trimmed.
  */
 internal val DEFAULT_REPO_ICONS: Map<String, String> = mapOf(
     "https://f-droid.org/repo" to
@@ -69,10 +70,11 @@ internal val DEFAULT_REPO_ICONS: Map<String, String> = mapOf(
         "https://fdroid.i2pd.xyz/fdroid/repo/icons/purplei2p.png",
     "https://fdroid.ironfoxoss.org/fdroid/repo" to
         "https://fdroid.ironfoxoss.org/fdroid/repo/icons/ironfox.png",
-    // These repos publish a QR code (or placeholder) as their repo icon, but each is a single-app repo,
-    // so we use that app's real icon instead. Fcitx5's own repo only holds plugins, so its logo comes
-    // from the main app on F-Droid. (Wind Project and Patched Apps are genuine multi-app collections
-    // with no single logo, so they keep the letter monogram.)
+    // These repos publish a QR code or the generic placeholder as their repo icon, but their flagship
+    // app has a real icon, so we use that instead. Fcitx5's own repo only holds plugins, so its logo
+    // comes from the main app on F-Droid. (Cromite's server didn't serve its index when checked, and
+    // NanoDroid / TwinHelix / Wind Project / Patched Apps are multi-app or icon-less, so they keep the
+    // letter monogram.)
     "https://fdroid.fedilab.app/repo" to
         "https://fdroid.fedilab.app/repo/fr.gouv.etalab.mastodon/en-US/icon_2Jq-Bi5vXhNbP7Gd4VO4p77Ws9PviSLtxIt4aKMrAL0=.png",
     "https://fdroid.cakelabs.com/fdroid/repo" to
@@ -81,6 +83,16 @@ internal val DEFAULT_REPO_ICONS: Map<String, String> = mapOf(
         "https://breezy-weather.github.io/fdroid-repo/fdroid/repo/org.breezyweather/en-US/icon_9s6OWodFUYb8-7w_fcaXpGLD1cw1YKEVneV4H1xpToI=.png",
     "https://f5a.torus.icu/fdroid/repo" to
         "https://f-droid.org/repo/org.fcitx.fcitx5.android/en-US/icon_oJHkpx5GsjyrG5_nxTfEs2FmP6g7_hmnbE6rKQjLRoI=.png",
+    "https://static.cryptomator.org/android/fdroid/repo" to
+        "https://static.cryptomator.org/android/fdroid/repo/org.cryptomator/en-US/icon_7xJFlQlRtgL84gUfd2p_havFrUXO36Gb7Y00E21HhaA=.png",
+    // SpiritCroc's flagship app is SchildiChat, so the repo uses its icon.
+    "https://s2.spiritcroc.de/fdroid/repo" to
+        "https://s2.spiritcroc.de/fdroid/repo/chat.schildi.android/en-US/icon_F6cFvN-V4ZlfBHqQDDJ2ZTkxx24CwjkAN5gHZDFr_e8=.png",
+    "https://s2.spiritcroc.de/testing/fdroid/repo" to
+        "https://s2.spiritcroc.de/testing/fdroid/repo/chat.schildi.next/en-US/icon_F6cFvN-V4ZlfBHqQDDJ2ZTkxx24CwjkAN5gHZDFr_e8=.png",
+    // Total Commander serves only the legacy v1 index, whose icons live under icons-640/.
+    "https://raw.githubusercontent.com/chrisgch/tca/master/fdroid/repo" to
+        "https://raw.githubusercontent.com/chrisgch/tca/master/fdroid/repo/icons-640/com.ghisler.android.TotalCommander.png",
     "https://brave-browser-apk-release.s3.brave.com/fdroid/repo" to
         "https://brave-browser-apk-release.s3.brave.com/fdroid/repo/icons/icon.png",
     "https://brave-browser-apk-beta.s3.brave.com/fdroid/repo" to
