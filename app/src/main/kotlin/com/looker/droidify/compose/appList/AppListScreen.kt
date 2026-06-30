@@ -156,6 +156,7 @@ fun AppListScreen(
     val newApps by viewModel.newApps.collectAsStateWithLifecycle()
     val recentlyUpdatedApps by viewModel.recentlyUpdatedApps.collectAsStateWithLifecycle()
     val mostDownloadedApps by viewModel.mostDownloadedApps.collectAsStateWithLifecycle()
+    val tvApps by viewModel.tvApps.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val favouritesOnly by viewModel.favouritesOnly.collectAsStateWithLifecycle()
     val expandedSections by viewModel.expandedSections.collectAsStateWithLifecycle()
@@ -492,6 +493,20 @@ fun AppListScreen(
                 // otherwise sits glued to the tabs.
                 item(span = { GridItemSpan(maxLineSpan) }, key = "discover-top-gap") {
                     Spacer(Modifier.height(12.dp))
+                }
+                // TV only: lead with apps actually built for the television (leanback launcher), so
+                // remote users find something usable first. Hidden on touch and when none are present.
+                if (isTelevision && tvApps.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "carousel-tv") {
+                        DiscoverCarousel(
+                            title = stringResource(R.string.discover_tv_apps),
+                            apps = tvApps,
+                            installedPackages = installedPackages,
+                            onAppClick = openApp,
+                            onSeeAll = { viewModel.openSection(SECTION_TV) },
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
+                    }
                 }
                 if (newApps.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }, key = "carousel-new") {
@@ -1245,6 +1260,7 @@ private fun sectionTitle(key: String?): String = when (key) {
     SECTION_WHATS_NEW -> stringResource(R.string.discover_new_apps)
     SECTION_RECENTLY_UPDATED -> stringResource(R.string.discover_recently_updated)
     SECTION_MOST_DOWNLOADED -> stringResource(R.string.discover_most_downloaded)
+    SECTION_TV -> stringResource(R.string.discover_tv_apps)
     else -> ""
 }
 
