@@ -68,14 +68,19 @@ class ExternalAppsViewModel @Inject constructor(
     private val scanningAccounts = MutableStateFlow<Set<String>>(emptySet())
 
     init {
-        // Discover the apps of any account that has never been scanned (lastScan == 0) as soon as it
-        // appears (the built-in Omnify account seeded on first run, or one added programmatically)
-        // without waiting for the throttled refresh, so its apps show up promptly. A manually added
-        // account is already scanned at add time (lastScan set), so it's skipped here.
+        // Discover the apps of any enabled account that has never been scanned (lastScan == 0) as soon
+        // as it appears (one added/enabled by the user) without waiting for the throttled refresh, so
+        // its apps show up promptly. A manually added account is already scanned at add time; a disabled
+        // account (e.g. the opt-in account seeded on first run) is left inert until the user enables it.
         viewModelScope.launch {
             repository.accounts.collect { list ->
                 list.forEach { account ->
-                    if (account.lastScan != 0L || account.key in scanningAccounts.value) return@forEach
+                    if (!account.enabled ||
+                        account.lastScan != 0L ||
+                        account.key in scanningAccounts.value
+                    ) {
+                        return@forEach
+                    }
                     scanningAccounts.update { it + account.key }
                     launch {
                         try {
@@ -485,10 +490,13 @@ class ExternalAppsViewModel @Inject constructor(
                     snack(context.getString(R.string.external_account_already_added, account.label))
                     return@launch
                 }
+                // Don't absorb a repo the user already tracks as its own single-repo source (e.g. the
+                // built-in Omnify repo): leave it standalone.
+                val standaloneKeys = apps.value.filter { it.accountKey == null }.map { it.key }.toSet()
                 val discovered = discoverAccountApps(
                     account = account,
                     repos = repos,
-                    skipKeys = emptySet(),
+                    skipKeys = standaloneKeys,
                     includePrereleases = includePrereleases,
                     muteUpdates = muteUpdates,
                     apkFilter = apkFilter,
@@ -583,11 +591,16 @@ class ExternalAppsViewModel @Inject constructor(
         // Bump the last-scan time even when the listing fails/empties, so a transient failure doesn't make
         // every refresh hammer the API; a real new app shows up at the next daily scan.
         if (repos.isNotEmpty()) {
-            val existingKeys = apps.value.filter { it.accountKey == account.key }.map { it.key }.toSet()
+            // Skip repos already tracked: this account's existing apps, plus any standalone single-repo
+            // source (so the account never absorbs e.g. the built-in Omnify repo).
+            val skipKeys = apps.value
+                .filter { it.accountKey == null || it.accountKey == account.key }
+                .map { it.key }
+                .toSet()
             val discovered = discoverAccountApps(
                 account = account,
                 repos = repos,
-                skipKeys = existingKeys,
+                skipKeys = skipKeys,
                 includePrereleases = false,
                 muteUpdates = false,
                 apkFilter = "",
@@ -724,11 +737,15 @@ class ExternalAppsViewModel @Inject constructor(
                     )
                 }
             }
-            // Once a day, re-scan each account for newly published apps (the apps it already found are
-            // refreshed by the per-app loop above). Skipped the rest of the time, so it barely adds to
-            // the API cost.
+            // Once a day, re-scan each enabled account for newly published apps (the apps it already
+            // found are refreshed by the per-app loop above). Disabled accounts and never-scanned ones
+            // (handled by the init watcher) are skipped, so this barely adds to the API cost.
             accounts.value
-                .filter { System.currentTimeMillis() - it.lastScan > ACCOUNT_RESCAN_INTERVAL_MS }
+                .filter {
+                    it.enabled &&
+                        it.lastScan != 0L &&
+                        System.currentTimeMillis() - it.lastScan > ACCOUNT_RESCAN_INTERVAL_MS
+                }
                 .forEach { rescanAccountNow(it) }
         }
     }

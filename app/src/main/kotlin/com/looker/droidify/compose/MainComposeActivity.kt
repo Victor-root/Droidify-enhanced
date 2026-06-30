@@ -51,6 +51,7 @@ import com.looker.droidify.data.AppRepository
 import com.looker.droidify.data.RepoRepository
 import com.looker.droidify.datastore.SettingsRepository
 import com.looker.droidify.external.ExternalAccount
+import com.looker.droidify.external.ExternalApp
 import com.looker.droidify.external.ExternalAppRepository
 import com.looker.droidify.external.SourceProvider
 import com.looker.droidify.datastore.extension.getThemeRes
@@ -104,22 +105,37 @@ class MainComposeActivity : ComponentActivity() {
         private const val FIRST_RUN_PREFS = "first_run"
         private const val KEY_UNKNOWN_SOURCES_PROMPTED = "unknown_sources_prompted"
 
-        // Omnify's own GitHub account, seeded once as a built-in account source so users get Omnify
-        // (and the developer's sibling apps) and their updates through the very feature the app is built
-        // around. OMNIFY_SOURCE_REPO is only kept to clean up the older single-repo seed.
+        // Seeded once on first run: Omnify's own repo as the active update channel, plus the developer's
+        // whole GitHub account as a separate, opt-in (disabled) source.
         private const val OMNIFY_SOURCE_OWNER = "Victor-root"
         private const val OMNIFY_SOURCE_REPO = "Omnify"
-        private const val KEY_OMNIFY_ACCOUNT_SEEDED = "omnify_account_seeded"
+        // The stable release's applicationId (the alpha/debug variants add a suffix); the source tracks
+        // the stable channel, matched against this id regardless of the running build.
+        private const val OMNIFY_PACKAGE_NAME = "com.omnify.vroot"
+        private const val KEY_OMNIFY_SEED = "omnify_seed_v2"
     }
 
-    /** The built-in Omnify source: the developer's whole GitHub account, tracked as an account source.
-     *  Forks are included because the apps are published as forks of upstream projects; it's labelled
-     *  "Omnify" and shown with the app's own logo. Its apps are discovered on the first refresh. */
-    private fun omnifyAccount(): ExternalAccount = ExternalAccount(
+    /** Omnify's own repo (github.com/Victor-root/Omnify) as the built-in update channel, active by
+     *  default. [packageName] matches the installed app so its real name/icon show right away. */
+    private fun omnifyUpdateSource(): ExternalApp = ExternalApp(
         provider = SourceProvider.GITHUB,
         owner = OMNIFY_SOURCE_OWNER,
+        repo = OMNIFY_SOURCE_REPO,
         label = getString(R.string.application_name),
+        packageName = OMNIFY_PACKAGE_NAME,
+        installedTag = BuildConfig.VERSION_NAME.removeSuffix(".a").removeSuffix(".d"),
         enabled = true,
+    )
+
+    /** The developer's whole GitHub account as a second, opt-in source: disabled by default (the user
+     *  enables it to get every app of the account), forks included (the apps are published as forks),
+     *  labelled with the account name but shown with the app's own logo (see [ExternalAccount.OMNIFY_KEY]).
+     *  The Omnify repo above is tracked separately, so the account won't absorb it. */
+    private fun victorAccount(): ExternalAccount = ExternalAccount(
+        provider = SourceProvider.GITHUB,
+        owner = OMNIFY_SOURCE_OWNER,
+        label = OMNIFY_SOURCE_OWNER,
+        enabled = false,
         includeForks = true,
     )
 
@@ -255,14 +271,15 @@ class MainComposeActivity : ComponentActivity() {
                 .filter { it.address in enabledByDefault && !it.enabled }
                 .forEach { repository.enableRepository(it, enable = true) }
 
-            // One-time: pre-add Omnify's own GitHub account as a built-in source so the app (and the
-            // developer's sibling apps) update through the external-source feature. Guarded by a flag
-            // (not by "is the list empty"), so if the user removes it, it stays removed. Also drops the
-            // older single-repo Omnify seed if a previous version added it; the account re-discovers it.
-            if (!firstRunPrefs.getBoolean(KEY_OMNIFY_ACCOUNT_SEEDED, false)) {
-                externalAppRepository.removeApp("${SourceProvider.GITHUB.name}/$OMNIFY_SOURCE_OWNER/$OMNIFY_SOURCE_REPO")
-                externalAppRepository.upsertAccount(omnifyAccount())
-                firstRunPrefs.edit().putBoolean(KEY_OMNIFY_ACCOUNT_SEEDED, true).apply()
+            // One-time: seed Omnify's own repo as the active update channel, plus the developer's whole
+            // GitHub account as a separate, opt-in (disabled) source. Guarded by a flag (not by "is the
+            // list empty"), so if the user removes either it stays removed. Clean up the previous
+            // whole-account-enabled seed shape (its discovered apps) before re-seeding.
+            if (!firstRunPrefs.getBoolean(KEY_OMNIFY_SEED, false)) {
+                externalAppRepository.removeAppsByAccount(ExternalAccount.OMNIFY_KEY)
+                externalAppRepository.addApp(omnifyUpdateSource())
+                externalAppRepository.upsertAccount(victorAccount())
+                firstRunPrefs.edit().putBoolean(KEY_OMNIFY_SEED, true).apply()
             }
 
             // Self-heal an empty catalog. A schema migration recreates the database: the repo rows
