@@ -366,9 +366,10 @@ class ExternalApi @Inject constructor(
     }
 
     /**
-     * Lists the repos of a whole account [owner] (a user or org) on [provider]/[host], skipping forks
-     * and archived repos. Used by the account-source feature; the caller then keeps only the repos that
-     * actually ship an installable APK release. Paged, with a bounded page count. Never throws.
+     * Lists the repos of a whole account [owner] (a user or org) on [provider]/[host], skipping only
+     * archived repos (forks are kept on purpose: a fork that ships an APK release is a real app). Used by
+     * the account-source feature; the caller then keeps only the repos that actually ship an installable
+     * APK release. Paged, with a bounded page count. Never throws.
      */
     suspend fun listAccountRepos(
         provider: SourceProvider,
@@ -430,7 +431,11 @@ class ExternalApi @Inject constructor(
 
     private fun giteaPage(text: String, fallbackOwner: String): PageResult {
         val dtos = json.decodeFromString(ListSerializer(GiteaRepoDto.serializer()), text)
-        val refs = dtos.filterNot { it.fork || it.archived }
+        // Forks are kept on purpose: users often fork an app and publish their own builds (that's the
+        // whole point of this client), so a fork that ships an APK release is a real app. Only archived
+        // repos (explicitly retired by the owner) are skipped; the release-APK check below is the real
+        // filter.
+        val refs = dtos.filterNot { it.archived }
             .map { RepoRef(it.owner.login.ifEmpty { fallbackOwner }, it.name) }
         return PageResult(refs, dtos.size)
     }

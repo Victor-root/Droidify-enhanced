@@ -452,7 +452,18 @@ class ExternalAppsViewModel @Inject constructor(
                     apkFilter = apkFilter,
                 )
                 if (discovered.isEmpty()) {
-                    snack(context.getString(R.string.external_account_no_apps, ref.owner), long = true)
+                    // Distinguish "really nothing to install" from "the API rate limit cut the per-repo
+                    // release checks short" (which would also yield nothing), so the user knows to add a
+                    // token rather than think their account has no apps.
+                    val suggestToken = externalApi.shouldSuggestGithubToken()
+                    snack(
+                        message = if (suggestToken) {
+                            context.getString(R.string.external_rate_limited)
+                        } else {
+                            context.getString(R.string.external_account_no_apps, ref.owner)
+                        },
+                        long = true,
+                    )
                     return@launch
                 }
                 repository.upsertApps(discovered)
