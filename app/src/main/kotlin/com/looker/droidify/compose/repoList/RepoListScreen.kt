@@ -600,17 +600,21 @@ private fun railLetterAt(y: Float, heightPx: Int): Char? {
 @Composable
 private fun RepoIcon(
     iconUrl: String?,
+    fallbackUrl: String?,
     name: String,
     enabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val shape = MaterialTheme.shapes.large
-    // Reset the failed flag if the URL changes (e.g. after a sync supplies one).
-    var failed by remember(iconUrl) { mutableStateOf(false) }
+    // Prefer the synced icon (freshest); for the many default repos that ship disabled and were never
+    // synced, fall back to the hardcoded logo. Only the letter monogram remains if neither is available
+    // or the chosen image fails to load.
+    val url = iconUrl?.takeIf { it.isNotBlank() } ?: fallbackUrl
+    var failed by remember(url) { mutableStateOf(false) }
     Box(modifier = modifier.clip(shape), contentAlignment = Alignment.Center) {
-        if (!iconUrl.isNullOrBlank() && !failed) {
+        if (!url.isNullOrBlank() && !failed) {
             AsyncImage(
-                model = iconUrl,
+                model = url,
                 contentDescription = null,
                 colorFilter = if (enabled) null else GrayScaleColorFilter,
                 onError = { failed = true },
@@ -675,6 +679,7 @@ private fun RepoItem(
     ) {
         RepoIcon(
             iconUrl = repo.icon?.path,
+            fallbackUrl = defaultRepoIcon(repo.address),
             name = repo.name,
             enabled = repo.enabled,
             modifier = Modifier.size(48.dp),
