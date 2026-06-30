@@ -1,5 +1,7 @@
 package com.looker.droidify.compose.repoList
 
+import com.looker.droidify.R
+
 /**
  * Hardcoded icon URLs for the bundled default repositories, keyed by repo address (without a trailing
  * slash). Most default repos ship disabled, so they're never synced and we hold no icon for them; this
@@ -58,8 +60,6 @@ internal val DEFAULT_REPO_ICONS: Map<String, String> = mapOf(
         "https://app.simplex.chat/fdroid/repo/icons/1.png",
     "https://f-droid.monerujo.io/fdroid/repo" to
         "https://f-droid.monerujo.io/fdroid/repo/icons/fdroid-icon.png",
-    "https://fdroid.cakelabs.com/fdroid/repo" to
-        "https://fdroid.cakelabs.com/fdroid/repo/icons/icon.png",
     "https://app.futo.org/fdroid/repo" to
         "https://app.futo.org/fdroid/repo/icons/FUTO.png",
     "https://fdroid.mm20.de/repo" to
@@ -72,9 +72,9 @@ internal val DEFAULT_REPO_ICONS: Map<String, String> = mapOf(
         "https://fdroid.ironfoxoss.org/fdroid/repo/icons/ironfox.png",
     // These repos publish a QR code or the generic placeholder as their repo icon, but their flagship
     // app has a real icon, so we use that instead. Fcitx5's own repo only holds plugins, so its logo
-    // comes from the main app on F-Droid. (Cromite's server didn't serve its index when checked, and
-    // NanoDroid / TwinHelix / Wind Project / Patched Apps are multi-app or icon-less, so they keep the
-    // letter monogram.)
+    // comes from the main app on F-Droid. (Cromite is left out: its server didn't serve its index when
+    // checked. Wind Project and Patched Apps are multi-app collections, handled by DEFAULT_REPO_ICON_RES
+    // below.)
     "https://fdroid.fedilab.app/repo" to
         "https://fdroid.fedilab.app/repo/fr.gouv.etalab.mastodon/en-US/icon_2Jq-Bi5vXhNbP7Gd4VO4p77Ws9PviSLtxIt4aKMrAL0=.png",
     "https://fdroid.cakelabs.com/fdroid/repo" to
@@ -93,6 +93,12 @@ internal val DEFAULT_REPO_ICONS: Map<String, String> = mapOf(
     // Total Commander serves only the legacy v1 index, whose icons live under icons-640/.
     "https://raw.githubusercontent.com/chrisgch/tca/master/fdroid/repo" to
         "https://raw.githubusercontent.com/chrisgch/tca/master/fdroid/repo/icons-640/com.ghisler.android.TotalCommander.png",
+    // These ship no usable icon in their index, so the logo comes from the project itself: Signal's
+    // logo for TwinHelix's Signal-FOSS, and the NanoLX brand icon for NanoDroid.
+    "https://fdroid.twinhelix.com/fdroid/repo" to
+        "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/Signal-Logo.svg/330px-Signal-Logo.svg.png",
+    "https://nanolx.org/fdroid/repo" to
+        "https://nanolx.org/wp-content/uploads/cropped-cropped-Nanolx3-small-1-192x192.png",
     "https://brave-browser-apk-release.s3.brave.com/fdroid/repo" to
         "https://brave-browser-apk-release.s3.brave.com/fdroid/repo/icons/icon.png",
     "https://brave-browser-apk-beta.s3.brave.com/fdroid/repo" to
@@ -104,3 +110,17 @@ internal val DEFAULT_REPO_ICONS: Map<String, String> = mapOf(
 /** The hardcoded logo URL for a repo [address] (trailing slash ignored), or null when none is known. */
 internal fun defaultRepoIcon(address: String): String? =
     DEFAULT_REPO_ICONS[address.trimEnd('/')]
+
+/**
+ * Bundled drawable icons for repos that are multi-app collections with no single brand logo (and whose
+ * declared icon is a QR code): a generic "multiple apps" glyph reads better than a single letter. Takes
+ * priority over the (QR) synced icon. Keyed by repo address, trailing slash trimmed.
+ */
+internal val DEFAULT_REPO_ICON_RES: Map<String, Int> = mapOf(
+    "https://guardianproject-wind.s3.amazonaws.com/fdroid/repo" to R.drawable.ic_tabler_apps,
+    "https://thecapslock.gitlab.io/fdroid-patched-apps/fdroid/repo" to R.drawable.ic_tabler_apps,
+)
+
+/** The bundled drawable icon for a repo [address] (trailing slash ignored), or null when none applies. */
+internal fun defaultRepoIconRes(address: String): Int? =
+    DEFAULT_REPO_ICON_RES[address.trimEnd('/')]
