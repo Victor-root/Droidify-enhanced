@@ -32,7 +32,6 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.*
-import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.ExperimentalTime
@@ -73,49 +72,43 @@ class DownloadStatsWorker @AssistedInject constructor(
     private suspend fun fetchData(settings: Settings) = withContext(Dispatchers.IO) {
         supervisorScope {
             val lastModified = settings.lastModifiedDownloadStats
-            val fileNames = ConcurrentLinkedQueue(
-                generateMonthlyFileNames(lastModified),
-            )
+            val fileNames = generateMonthlyFileNames(lastModified)
 
             Log.d(TAG, "Fetching ${fileNames.size} monthly files")
-            while (fileNames.isNotEmpty()) {
-                if (downloadSemaphores.tryAcquire()) {
-                    launch {
-                        val fileName = fileNames.poll()
-                        if (fileName == null) {
-                            downloadSemaphores.release()
-                            return@launch
-                        }
-                        // This runs in a launch{} inside a supervisorScope, so an uncaught throw here
-                        // would NOT bubble up to doWork()'s try/catch — it would crash the whole app.
-                        // Catch everything (a flaky download, a bad month file, even a temp-file
-                        // failure): log it and move on. The outer finally always frees the semaphore
-                        // so a failure can't deadlock the fetch loop either.
+            for (fileName in fileNames) {
+                // Suspend until a slot is free (cap: 2 concurrent). The previous code spun the loop on
+                // tryAcquire(), pegging a CPU core while waiting — costly during the first-launch load.
+                downloadSemaphores.acquire()
+                launch {
+                    // This runs in a launch{} inside a supervisorScope, so an uncaught throw here would
+                    // NOT bubble up to doWork()'s try/catch — it would crash the whole app. Catch
+                    // everything (a flaky download, a bad month file, even a temp-file failure): log it
+                    // and move on. The outer finally always frees the semaphore so a failure can't
+                    // deadlock the fetch loop either.
+                    try {
+                        val target = Cache.getTemporaryFile(context)
                         try {
-                            val target = Cache.getTemporaryFile(context)
-                            try {
-                                Log.i(TAG, "Downloading $fileName")
-                                val response = downloadFile(fileName, target)
-                                Log.i(TAG, "Downloaded $fileName with $response")
+                            Log.i(TAG, "Downloading $fileName")
+                            val response = downloadFile(fileName, target)
+                            Log.i(TAG, "Downloaded $fileName with $response")
 
-                                if (response is NetworkResponse.Success &&
-                                    response.statusCode != HttpStatusCode.NotModified.value
-                                ) {
-                                    processDownloadStats(
-                                        response = response,
-                                        fileName = fileName,
-                                        target = target,
-                                    )
-                                }
-                            } finally {
-                                target.delete()
+                            if (response is NetworkResponse.Success &&
+                                response.statusCode != HttpStatusCode.NotModified.value
+                            ) {
+                                processDownloadStats(
+                                    response = response,
+                                    fileName = fileName,
+                                    target = target,
+                                )
                             }
-                        } catch (e: Exception) {
-                            e.exceptCancellation()
-                            Log.e(TAG, "Failed processing $fileName", e)
                         } finally {
-                            downloadSemaphores.release()
+                            target.delete()
                         }
+                    } catch (e: Exception) {
+                        e.exceptCancellation()
+                        Log.e(TAG, "Failed processing $fileName", e)
+                    } finally {
+                        downloadSemaphores.release()
                     }
                 }
             }
