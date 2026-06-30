@@ -369,6 +369,12 @@
     <string name="external_already_added">%1$s est déjà dans votre liste</string>
     <string name="external_no_release">Aucune release trouvée pour %1$s (ou limite d\'API atteinte)</string>
     <string name="external_added">%1$s ajouté</string>
+    <string name="external_account_added">Compte ajouté : %1$s (%2$d apps)</string>
+    <string name="external_account_already_added">Le compte %1$s est déjà dans votre liste</string>
+    <string name="external_account_no_repos">Impossible de lister les dépôts de %1$s (ou limite d\'API atteinte)</string>
+    <string name="external_account_no_apps">Aucune app avec une release APK trouvée pour %1$s</string>
+    <string name="external_account_apps">%1$d apps</string>
+    <string name="external_account_rescan">Rescanner</string>
     <string name="external_unreachable">Impossible de joindre %1$s</string>
     <string name="external_no_apk">La dernière release de %1$s ne contient pas d\'APK</string>
     <string name="external_download_failed">Échec du téléchargement de %1$s</string>
@@ -383,7 +389,7 @@
     <string name="add_source_fdroid">Dépôt F-Droid</string>
     <string name="add_source_fdroid_desc">Un catalogue que vous synchronisez pour parcourir et installer plein d\'applis depuis une seule adresse (les dépôts F-Droid classiques).</string>
     <string name="add_source_external">Source externe</string>
-    <string name="add_source_external_desc">Suivez une seule appli directement depuis ses releases (GitHub, GitLab, Codeberg, ou un Gitea/Forgejo auto-hébergé).</string>
+    <string name="add_source_external_desc">Suivez une appli directement depuis ses releases (GitHub, GitLab, Codeberg, ou un Gitea/Forgejo auto-hébergé). Collez un compte entier (ex. github.com/pseudo) pour ajouter toutes ses applis d\'un coup.</string>
     <string name="install_failed_signature_mismatch">%1$s est déjà installé depuis une autre source. Désinstallez-le d\'abord, puis installez cette version.</string>
     <string name="signature_conflict_title">Désinstallation nécessaire</string>
     <string name="signature_conflict_system_title">Remplacement impossible</string>

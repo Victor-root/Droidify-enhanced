@@ -68,6 +68,7 @@ import com.looker.droidify.compose.externalApps.AddSourceState
 import com.looker.droidify.compose.externalApps.ExternalAppIcon
 import com.looker.droidify.compose.externalApps.ExternalAppsViewModel
 import com.looker.droidify.data.model.Repo
+import com.looker.droidify.external.ExternalAccount
 import com.looker.droidify.external.ExternalApp
 import com.looker.droidify.utility.text.toAnnotatedString
 import com.looker.droidify.compose.theme.AccentBarHeight
@@ -89,6 +90,7 @@ fun RepoListScreen(
     // tab. Both are backed by the same singleton repositories, so the lists stay in sync everywhere.
     val externalViewModel: ExternalAppsViewModel = hiltViewModel()
     val externalApps by externalViewModel.apps.collectAsStateWithLifecycle()
+    val externalAccounts by externalViewModel.accounts.collectAsStateWithLifecycle()
     val externalInstalledKeys by externalViewModel.installedKeys.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         externalViewModel.refreshInstalled()
@@ -101,8 +103,16 @@ fun RepoListScreen(
 
     // Each section lists its sources one after another, sorted alphabetically by display name. Now that
     // every repo has a real logo (or a letter monogram), the icons make scanning easy without grouping.
+    // Account sources show as one row each; the apps they discovered are folded into that account, so the
+    // flat list shows only standalone (single-repo) sources, with the accounts listed above them.
+    val sortedAccounts = remember(externalAccounts) {
+        externalAccounts.sortedBy { it.label.trim().lowercase() }
+    }
+    val accountAppCounts = remember(externalApps) {
+        externalApps.mapNotNull { it.accountKey }.groupingBy { it }.eachCount()
+    }
     val sortedExternalApps = remember(externalApps) {
-        externalApps.sortedBy { it.label.trim().lowercase() }
+        externalApps.filter { it.accountKey == null }.sortedBy { it.label.trim().lowercase() }
     }
     val sortedRepos = remember(repos) {
         repos.sortedBy { it.name.trim().lowercase() }
@@ -153,7 +163,7 @@ fun RepoListScreen(
             item(key = "external-header") {
                 SectionHeader(title = stringResource(R.string.tab_external))
             }
-            if (sortedExternalApps.isEmpty()) {
+            if (sortedAccounts.isEmpty() && sortedExternalApps.isEmpty()) {
                 item(key = "external-empty") {
                     Text(
                         text = stringResource(R.string.external_empty_hint),
@@ -162,6 +172,15 @@ fun RepoListScreen(
                         modifier = Modifier.padding(16.dp),
                     )
                 }
+            }
+            items(sortedAccounts, key = { "acc-${it.key}" }) { account ->
+                ExternalAccountItem(
+                    account = account,
+                    appCount = accountAppCounts[account.key] ?: 0,
+                    onToggle = { externalViewModel.setAccountEnabled(account, !account.enabled) },
+                    onRescan = { externalViewModel.rescanAccount(account) },
+                    onRemove = { externalViewModel.removeAccount(account) },
+                )
             }
             items(sortedExternalApps, key = { "ext-${it.key}" }) { app ->
                 ExternalSourceItem(
@@ -429,6 +448,70 @@ private fun ExternalSourceItem(
             Icon(
                 imageVector = Icons.Default.Edit,
                 contentDescription = stringResource(R.string.external_edit_source),
+            )
+        }
+        IconButton(onClick = onRemove) {
+            Icon(
+                painter = painterResource(R.drawable.ic_tabler_trash),
+                contentDescription = stringResource(R.string.external_remove),
+            )
+        }
+    }
+}
+
+/** A whole-account source as a management row: the account avatar, its name, "provider · N apps", an
+ *  enable/disable toggle (which cascades to its apps), a rescan button (look for newly published apps)
+ *  and a remove button. The account's individual apps appear on the External tab. */
+@Composable
+private fun ExternalAccountItem(
+    account: ExternalAccount,
+    appCount: Int,
+    onToggle: () -> Unit,
+    onRescan: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    val contentAlpha = if (account.enabled) 1f else 0.4f
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+    ) {
+        RepoIcon(
+            iconUrl = account.iconUrl,
+            fallbackUrl = null,
+            name = account.label,
+            modifier = Modifier
+                .size(48.dp)
+                .alpha(contentAlpha),
+        )
+        Spacer(modifier = Modifier.size(16.dp))
+        Column(
+            modifier = Modifier
+                .weight(1F)
+                .alpha(contentAlpha),
+        ) {
+            Text(text = account.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                text = "${account.sourceLabel} · " +
+                    stringResource(R.string.external_account_apps, appCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(modifier = Modifier.size(8.dp))
+        FilledIconToggleButton(
+            checked = account.enabled,
+            onCheckedChange = { onToggle() },
+        ) {
+            Icon(imageVector = Icons.Default.Check, contentDescription = null)
+        }
+        IconButton(onClick = onRescan) {
+            Icon(
+                painter = painterResource(R.drawable.ic_tabler_refresh),
+                contentDescription = stringResource(R.string.external_account_rescan),
             )
         }
         IconButton(onClick = onRemove) {
