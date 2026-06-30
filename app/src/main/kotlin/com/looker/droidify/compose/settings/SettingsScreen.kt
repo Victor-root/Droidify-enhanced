@@ -477,6 +477,8 @@ fun SettingsScreen(
                     description = stringResource(R.string.auto_translate_DESC),
                     checked = settings.autoTranslate,
                     onCheckedChange = viewModel::setAutoTranslate,
+                    // No point auto-translating when no engine is selected.
+                    enabled = settings.translationEngine != TranslationEngine.NONE,
                 )
             }
 
