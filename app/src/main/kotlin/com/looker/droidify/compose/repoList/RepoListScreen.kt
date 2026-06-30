@@ -189,6 +189,7 @@ fun RepoListScreen(
                         onToggle = { externalViewModel.setSourceEnabled(omnifyApp, !omnifyApp.enabled) },
                         onEdit = null,
                         onRemove = null,
+                        brandWithAppIcon = true,
                     )
                 }
             }
@@ -499,6 +500,9 @@ private fun ExternalSourceItem(
     onToggle: () -> Unit,
     onEdit: (() -> Unit)?,
     onRemove: (() -> Unit)?,
+    // The built-in Omnify source is branded with the app's own launcher icon (always correct), instead
+    // of the discovered repo/avatar icon which would otherwise fall back to the GitHub owner's avatar.
+    brandWithAppIcon: Boolean = false,
 ) {
     val contentAlpha = if (app.enabled) 1f else 0.4f
     Row(
@@ -507,12 +511,16 @@ private fun ExternalSourceItem(
             .fillMaxWidth()
             .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
     ) {
-        ExternalAppIcon(
-            app = app,
-            isInstalled = isInstalled,
-            size = 48.dp,
-            modifier = Modifier.alpha(contentAlpha),
-        )
+        if (brandWithAppIcon) {
+            AppLauncherIcon(modifier = Modifier.size(48.dp).alpha(contentAlpha))
+        } else {
+            ExternalAppIcon(
+                app = app,
+                isInstalled = isInstalled,
+                size = 48.dp,
+                modifier = Modifier.alpha(contentAlpha),
+            )
+        }
         Spacer(modifier = Modifier.size(16.dp))
         Column(
             modifier = Modifier
