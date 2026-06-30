@@ -72,9 +72,8 @@ internal val DEFAULT_REPO_ICONS: Map<String, String> = mapOf(
         "https://fdroid.ironfoxoss.org/fdroid/repo/icons/ironfox.png",
     // These repos publish a QR code or the generic placeholder as their repo icon, but their flagship
     // app has a real icon, so we use that instead. Fcitx5's own repo only holds plugins, so its logo
-    // comes from the main app on F-Droid. (Cromite is left out: its server didn't serve its index when
-    // checked. Wind Project and Patched Apps are multi-app collections, handled by DEFAULT_REPO_ICON_RES
-    // below.)
+    // comes from the main app on F-Droid. (Wind Project and Patched Apps are multi-app collections,
+    // handled by DEFAULT_REPO_ICON_RES below.)
     "https://fdroid.fedilab.app/repo" to
         "https://fdroid.fedilab.app/repo/fr.gouv.etalab.mastodon/en-US/icon_2Jq-Bi5vXhNbP7Gd4VO4p77Ws9PviSLtxIt4aKMrAL0=.png",
     "https://fdroid.cakelabs.com/fdroid/repo" to
@@ -99,6 +98,10 @@ internal val DEFAULT_REPO_ICONS: Map<String, String> = mapOf(
         "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/Signal-Logo.svg/330px-Signal-Logo.svg.png",
     "https://nanolx.org/fdroid/repo" to
         "https://nanolx.org/wp-content/uploads/cropped-cropped-Nanolx3-small-1-192x192.png",
+    // Cromite's F-Droid repo didn't serve its index to a non-browser client; its app icon is published
+    // on the project site.
+    "https://www.cromite.org/fdroid/repo" to
+        "https://www.cromite.org/app_icon.png",
     "https://brave-browser-apk-release.s3.brave.com/fdroid/repo" to
         "https://brave-browser-apk-release.s3.brave.com/fdroid/repo/icons/icon.png",
     "https://brave-browser-apk-beta.s3.brave.com/fdroid/repo" to
