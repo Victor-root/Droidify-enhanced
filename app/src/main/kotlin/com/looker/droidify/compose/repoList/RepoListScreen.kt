@@ -15,10 +15,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -99,6 +102,18 @@ fun RepoListScreen(
     var showAddExternal by rememberSaveable { mutableStateOf(false) }
     var editingExternal by remember { mutableStateOf<ExternalApp?>(null) }
 
+    // Group sources whose names start the same way (e.g. "Brave Release" / "Brave Beta" / "Brave
+    // Nightly" -> one "Brave (3)" group) so several sources for the same thing read as one entry. A
+    // source with no sibling stays a plain row. Recomputed only when the underlying lists change.
+    val externalGroups = remember(externalApps) { groupByName(externalApps) { it.label } }
+    val repoGroups = remember(repos) { groupByName(repos) { it.name } }
+    // Groups are shown expanded by default (nothing is hidden); this tracks the ones the user collapsed
+    // to tidy the list. Keyed per section so an "ext" group and an "repo" group can't clash.
+    var collapsedGroups by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }
+    val toggleGroup: (String) -> Unit = { key ->
+        collapsedGroups = if (key in collapsedGroups) collapsedGroups - key else collapsedGroups + key
+    }
+
     // TV / D-pad: the top bar doesn't release focus downward on its own; this lets "down" drop from the
     // header into the list. No effect on touch.
     val contentFocusRequester = remember { FocusRequester() }
@@ -154,7 +169,13 @@ fun RepoListScreen(
                     )
                 }
             }
-            items(externalApps, key = { "ext-${it.key}" }) { app ->
+            groupedItems(
+                sectionId = "ext",
+                groups = externalGroups,
+                collapsedGroups = collapsedGroups,
+                onToggleGroup = toggleGroup,
+                keyOf = { "ext-${it.key}" },
+            ) { app ->
                 ExternalSourceItem(
                     app = app,
                     isInstalled = app.key in externalInstalledKeys,
@@ -167,7 +188,13 @@ fun RepoListScreen(
             item(key = "repos-header") {
                 SectionHeader(title = stringResource(R.string.repo_section_fdroid))
             }
-            items(repos, key = { "repo-${it.id}" }) { repo ->
+            groupedItems(
+                sectionId = "repo",
+                groups = repoGroups,
+                collapsedGroups = collapsedGroups,
+                onToggleGroup = toggleGroup,
+                keyOf = { "repo-${it.id}" },
+            ) { repo ->
                 RepoItem(
                     onClick = { onRepoClick(repo.id) },
                     onToggle = { viewModel.toggleRepo(repo) },
@@ -237,6 +264,99 @@ fun RepoListScreen(
                 )
                 editingExternal = null
             },
+        )
+    }
+}
+
+/** A set of sources whose names share a leading word, shown together under one collapsible header. */
+private data class NameGroup<T>(val key: String, val title: String, val members: List<T>)
+
+private val WHITESPACE = Regex("\\s+")
+
+/** Buckets [items] by the first word of their name (case-insensitive), preserving first-seen order.
+ *  A bucket with several members becomes a group titled by the words its names share (e.g. "Brave" or
+ *  "Brave Browser"); a lone member keeps its full name. */
+private fun <T> groupByName(items: List<T>, name: (T) -> String): List<NameGroup<T>> {
+    val buckets = LinkedHashMap<String, MutableList<T>>()
+    for (item in items) {
+        val firstWord = name(item).trim().split(WHITESPACE).firstOrNull { it.isNotEmpty() }.orEmpty()
+        buckets.getOrPut(firstWord.lowercase()) { mutableListOf() }.add(item)
+    }
+    return buckets.map { (key, members) ->
+        val title = if (members.size >= 2) commonNamePrefix(members.map(name)) else name(members.first())
+        NameGroup(key, title, members)
+    }
+}
+
+/** The leading words shared by every name (e.g. ["Brave Release", "Brave Beta"] -> "Brave"), falling
+ *  back to the first name if there's no shared word. */
+private fun commonNamePrefix(names: List<String>): String {
+    val tokens = names.map { it.trim().split(WHITESPACE).filter(String::isNotEmpty) }
+    val minLen = tokens.minOf { it.size }
+    val prefix = mutableListOf<String>()
+    for (i in 0 until minLen) {
+        val word = tokens.first()[i]
+        if (tokens.all { it[i].equals(word, ignoreCase = true) }) prefix += word else break
+    }
+    return prefix.joinToString(" ").ifEmpty { names.first() }
+}
+
+/** Renders one section's [groups]: a lone source as a plain [row]; a multi-source group as a
+ *  collapsible header ("Name (count)") with its [row]s nested beneath when expanded. Expanded unless
+ *  the user collapsed it (tracked in [collapsedGroups] by a per-section key). */
+private fun <T> LazyListScope.groupedItems(
+    sectionId: String,
+    groups: List<NameGroup<T>>,
+    collapsedGroups: Set<String>,
+    onToggleGroup: (String) -> Unit,
+    keyOf: (T) -> Any,
+    row: @Composable (T) -> Unit,
+) {
+    for (group in groups) {
+        if (group.members.size < 2) {
+            val item = group.members.first()
+            item(key = keyOf(item)) { row(item) }
+        } else {
+            val stateKey = "$sectionId:${group.key}"
+            val expanded = stateKey !in collapsedGroups
+            item(key = "$sectionId-group-${group.key}") {
+                RepoGroupHeader(
+                    title = group.title,
+                    count = group.members.size,
+                    expanded = expanded,
+                    onClick = { onToggleGroup(stateKey) },
+                )
+            }
+            if (expanded) {
+                items(group.members, key = { keyOf(it) }) { item ->
+                    // Slight indent so grouped rows read as belonging to the header above them.
+                    Box(modifier = Modifier.padding(start = 12.dp)) { row(item) }
+                }
+            }
+        }
+    }
+}
+
+/** A collapsible group's header: its shared name + member count, with a chevron showing open/closed. */
+@Composable
+private fun RepoGroupHeader(title: String, count: Int, expanded: Boolean, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Text(
+            text = "$title ($count)",
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+            contentDescription = null,
         )
     }
 }
