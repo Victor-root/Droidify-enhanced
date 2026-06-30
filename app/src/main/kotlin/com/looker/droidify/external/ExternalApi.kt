@@ -101,9 +101,11 @@ class ExternalApi @Inject constructor(
      * and the app's real user-facing name. A single repo-tree request drives both (the name then needs
      * the manifest + string file). Works for every provider. Never throws.
      */
-    suspend fun fetchRepoMetadata(app: ExternalApp): RepoMetadata = withContext(Dispatchers.IO) {
+    suspend fun fetchRepoMetadata(app: ExternalApp): RepoMetadata? = withContext(Dispatchers.IO) {
+        // Null (not an empty result) when the repo tree couldn't be read, so the caller can retry later
+        // instead of caching "nothing found" / "not a TV app" from a transient failure.
         val paths = fetchTreePaths(app)
-        if (paths.isEmpty()) return@withContext RepoMetadata()
+        if (paths.isEmpty()) return@withContext null
         RepoMetadata(
             iconCandidates = rankIconPaths(paths).map { app.readmeBaseUrl + it },
             appName = resolveAppName(app, paths),
