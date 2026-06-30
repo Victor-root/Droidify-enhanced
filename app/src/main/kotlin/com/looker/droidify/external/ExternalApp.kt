@@ -142,4 +142,10 @@ data class ExternalApp(
             installedTag != null && latestTag != null -> latestTag != installedTag
             else -> false
         }
+
+    companion object {
+        /** Key of the built-in Omnify repo source (github.com/Victor-root/Omnify). Pinned to the top of
+         *  the sources list and only toggleable (no edit/remove) since it's the app's own channel. */
+        const val OMNIFY_REPO_KEY = "GITHUB/Victor-root/Omnify"
+    }
 }

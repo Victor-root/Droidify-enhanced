@@ -178,6 +178,20 @@ fun RepoListScreen(
                     )
                 }
             }
+            // The built-in Omnify repo is pinned at the very top and can only be enabled/disabled (no
+            // edit/remove, since it's the app's own update channel).
+            val omnifyApp = sortedExternalApps.firstOrNull { it.key == ExternalApp.OMNIFY_REPO_KEY }
+            if (omnifyApp != null) {
+                item(key = "ext-${omnifyApp.key}") {
+                    ExternalSourceItem(
+                        app = omnifyApp,
+                        isInstalled = omnifyApp.key in externalInstalledKeys,
+                        onToggle = { externalViewModel.setSourceEnabled(omnifyApp, !omnifyApp.enabled) },
+                        onEdit = null,
+                        onRemove = null,
+                    )
+                }
+            }
             items(sortedAccounts, key = { "acc-${it.key}" }) { account ->
                 ExternalAccountItem(
                     account = account,
@@ -187,7 +201,10 @@ fun RepoListScreen(
                     onRemove = { externalViewModel.removeAccount(account) },
                 )
             }
-            items(sortedExternalApps, key = { "ext-${it.key}" }) { app ->
+            items(
+                sortedExternalApps.filter { it.key != ExternalApp.OMNIFY_REPO_KEY },
+                key = { "ext-${it.key}" },
+            ) { app ->
                 ExternalSourceItem(
                     app = app,
                     isInstalled = app.key in externalInstalledKeys,
@@ -452,15 +469,16 @@ private fun RepoItem(
 }
 
 /** A tracked external source as a management row: logo, name, owner/repo, an enable/disable toggle
- *  (like a repo) and a remove button. App actions (install, launch…) intentionally live elsewhere,
- *  on the External tab — this row only manages the source. */
+ *  (like a repo) and edit/remove buttons. App actions (install, launch…) intentionally live elsewhere,
+ *  on the External tab; this row only manages the source. [onEdit]/[onRemove] are null for a pinned
+ *  built-in source (the Omnify repo), which can only be toggled. */
 @Composable
 private fun ExternalSourceItem(
     app: ExternalApp,
     isInstalled: Boolean,
     onToggle: () -> Unit,
-    onEdit: () -> Unit,
-    onRemove: () -> Unit,
+    onEdit: (() -> Unit)?,
+    onRemove: (() -> Unit)?,
 ) {
     val contentAlpha = if (app.enabled) 1f else 0.4f
     Row(
@@ -501,17 +519,21 @@ private fun ExternalSourceItem(
         ) {
             Icon(imageVector = Icons.Default.Check, contentDescription = null)
         }
-        IconButton(onClick = onEdit) {
-            Icon(
-                imageVector = Icons.Default.Edit,
-                contentDescription = stringResource(R.string.external_edit_source),
-            )
+        if (onEdit != null) {
+            IconButton(onClick = onEdit) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = stringResource(R.string.external_edit_source),
+                )
+            }
         }
-        IconButton(onClick = onRemove) {
-            Icon(
-                painter = painterResource(R.drawable.ic_tabler_trash),
-                contentDescription = stringResource(R.string.external_remove),
-            )
+        if (onRemove != null) {
+            IconButton(onClick = onRemove) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_tabler_trash),
+                    contentDescription = stringResource(R.string.external_remove),
+                )
+            }
         }
     }
 }
