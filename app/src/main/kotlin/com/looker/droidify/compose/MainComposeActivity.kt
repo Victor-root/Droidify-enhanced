@@ -28,6 +28,7 @@ import androidx.navigation.compose.rememberNavController
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.color.DynamicColorsOptions
 import com.looker.droidify.BuildConfig
+import com.looker.droidify.R
 import com.looker.droidify.compose.appDetail.navigation.appDetail
 import com.looker.droidify.compose.appDetail.navigation.navigateToAppDetail
 import com.looker.droidify.compose.appList.navigation.AppList
