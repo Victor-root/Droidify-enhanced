@@ -74,6 +74,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
@@ -151,6 +153,13 @@ fun AppDetailScreen(
     }
     val uriHandler = LocalUriHandler.current
     val signatureConflict by viewModel.signatureConflict.collectAsStateWithLifecycle()
+
+    // Re-read the installed state on resume — in particular when returning from the system uninstall
+    // dialog — since installManager.state alone doesn't report a system uninstall. This is what lets the
+    // post-downgrade auto-install fire once the old version is actually gone.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        viewModel.refreshInstalled()
+    }
 
     signatureConflict?.let { conflict ->
         val conflictAppName = (state as? AppDetailState.Success)?.app?.metadata?.name
