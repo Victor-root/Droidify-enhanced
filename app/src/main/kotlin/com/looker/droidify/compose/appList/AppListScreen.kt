@@ -144,7 +144,6 @@ import com.looker.droidify.compose.theme.LocalStatusBarScrimAlpha
 import com.looker.droidify.compose.theme.accentTopAppBarColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -559,9 +558,10 @@ fun AppListScreen(
                 .then(swipeModifier)
                 .onSizeChanged { gridWidthPx = it.width }
                 .graphicsLayer {
+                    // Slide only — no alpha. Animating alpha here forces the whole grid into an offscreen
+                    // compositing buffer every frame, which stalled the heavier tabs (Updates) badly
+                    // enough to look frozen. A plain translation is a cheap GPU transform.
                     translationX = tabSlide.value * gridWidthPx
-                    // Ease the fade so it's fully opaque well before it settles, not linear with travel.
-                    alpha = 1f - (abs(tabSlide.value) * 0.6f)
                 },
         ) {
             // Installed package names, used to badge every tile that's already installed.
