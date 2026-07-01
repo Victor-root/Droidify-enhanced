@@ -140,11 +140,17 @@ class SyncWorker @AssistedInject constructor(
                 .addTag(TAG)
                 .build()
 
+            // APPEND_OR_REPLACE, not KEEP: enabling several repos in quick succession enqueues one sync
+            // each under the same unique name. KEEP dropped every sync after the first (only some repos
+            // synced, the rest needed a manual re-sync). Appending chains them so all enabled repos are
+            // synced, one after another — which also avoids decoding several large indexes at once (a
+            // memory spike on low-RAM devices). OR_REPLACE keeps the chain going even if one repo's sync
+            // ends up failing, instead of cancelling the ones queued behind it.
             WorkManager
                 .getInstance(context)
                 .enqueueUniqueWork(
                     uniqueWorkName = "$TAG.user",
-                    existingWorkPolicy = ExistingWorkPolicy.KEEP,
+                    existingWorkPolicy = ExistingWorkPolicy.APPEND_OR_REPLACE,
                     request = request,
                 )
             Log.i(TAG, "User sync enqueued (repoId=$repoId)")
