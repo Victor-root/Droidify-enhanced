@@ -251,14 +251,32 @@ class AppDetailViewModel @Inject constructor(
         .flowOn(Dispatchers.Default)
         .asStateFlow(AppDetailState.Loading)
 
-    /** Locale codes the app is translated into (its supported languages), for the detail screen's
-     *  "supported languages" section. Empty until the app is loaded / when none. */
-    val supportedLanguages: StateFlow<List<String>> = state
-        .map { s -> (s as? AppDetailState.Success)?.app?.appId }
-        .distinctUntilChanged()
-        .map { appId -> appId?.let { appRepository.supportedLocales(it) }.orEmpty() }
-        .flowOn(Dispatchers.Default)
-        .asStateFlow(emptyList())
+    /**
+     * Locale codes the app is translated into (its supported languages), for the detail screen's
+     * "supported languages" section. When the app is installed we read the *actual* UI languages from
+     * its APK resources (the truth: which res/values-XX it ships); that's what the user sees in the app.
+     * Otherwise we fall back to the F-Droid store-listing translations from the index — an approximation,
+     * since an app can ship a translated UI without a translated store listing (and vice versa).
+     */
+    val supportedLanguages: StateFlow<List<String>> = combine(
+        state.map { (it as? AppDetailState.Success)?.app?.appId }.distinctUntilChanged(),
+        installedInfo,
+    ) { appId, installed ->
+        val apkLocales = if (installed != null) installedApkLocales() else emptyList()
+        when {
+            apkLocales.isNotEmpty() -> apkLocales
+            appId != null -> appRepository.supportedLocales(appId)
+            else -> emptyList()
+        }
+    }.distinctUntilChanged().flowOn(Dispatchers.Default).asStateFlow(emptyList())
+
+    /** The locale codes the installed APK actually ships resources for (its real UI languages), read
+     *  from the package's AssetManager. Empty if it can't be read. */
+    private fun installedApkLocales(): List<String> = runCatching {
+        context.packageManager.getResourcesForApplication(packageName)
+            .assets.locales
+            .filter { it.isNotBlank() }
+    }.getOrDefault(emptyList())
 
     /** Launches the installed app, if it exposes a launcher activity. */
     fun launch() {
