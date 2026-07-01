@@ -563,9 +563,9 @@ fun AppListScreen(
                 .then(swipeModifier)
                 .onSizeChanged { gridWidthPx = it.width }
                 .graphicsLayer {
-                    // Slide only — no alpha. Animating alpha here forces the whole grid into an offscreen
-                    // compositing buffer every frame, which stalled the heavier tabs (Updates) badly
-                    // enough to look frozen. A plain translation is a cheap GPU transform.
+                    // Slide only — a plain translation is a cheap GPU transform. Deliberately no alpha:
+                    // animating it here would force the whole grid into an offscreen compositing buffer
+                    // every frame, which is needlessly expensive on long lists.
                     translationX = tabSlide.value * gridWidthPx
                 },
         ) {

@@ -10,13 +10,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -29,8 +27,6 @@ import com.looker.droidify.compose.components.TileIconSize
 import com.looker.droidify.compose.components.TvTileIconSize
 import com.looker.droidify.compose.theme.LocalIsTelevision
 import com.looker.droidify.data.model.AppMinimal
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /** Square pixel size the system fallback icon is rendered at (generous so it stays crisp at any tile
  *  size, including the focus zoom). */
@@ -48,31 +44,25 @@ private const val LauncherIconPx = 256
 fun AppMinimalIcon(app: AppMinimal, isInstalled: Boolean, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val isTelevision = LocalIsTelevision.current
-    var repoIcon by remember(app.appId) { mutableStateOf(app.icon?.path) }
-    var repoFailed by remember(app.appId) { mutableStateOf(false) }
-    // The installed app's own launcher icon, used only when the repo ships none. Loaded OFF the main
-    // thread (produceState + IO): reading it inline blocked composition, and on the Installed/Updates
-    // tabs — where every tile is an installed app — rendering/flinging the list did this for many tiles
-    // at once, hitching the UI badly enough to look frozen. Only load it when it's actually needed (no
-    // repo icon, or the repo icon failed), so most tiles never touch the package manager at all.
-    val needsLauncherIcon = isInstalled && (repoIcon == null || repoFailed)
-    val launcherIcon by produceState<ImageBitmap?>(null, app.packageName, needsLauncherIcon) {
-        value = if (needsLauncherIcon) {
-            withContext(Dispatchers.IO) {
-                runCatching {
-                    // Render into an explicit square bitmap. toBitmap() with no size uses the drawable's
-                    // intrinsic size, which for adaptive icons renders inconsistently across Android
-                    // versions (fine on newer phones, cropped/squished on older TV builds) — a square
-                    // output normalises it everywhere.
-                    context.packageManager.getApplicationIcon(app.packageName.name)
-                        .toBitmap(width = LauncherIconPx, height = LauncherIconPx)
-                        .asImageBitmap()
-                }.getOrNull()
-            }
+    // The installed app's own launcher icon, read once. Mirrors ExternalAppIcon; cheap enough for a
+    // list as the package manager caches it.
+    val launcherIcon = remember(app.packageName, isInstalled) {
+        if (isInstalled) {
+            runCatching {
+                // Render into an explicit square bitmap. toBitmap() with no size uses the drawable's
+                // intrinsic size, which for adaptive icons renders inconsistently across Android versions
+                // (fine on newer phones, cropped/squished on older TV builds) — forcing a square output
+                // normalises it everywhere.
+                context.packageManager.getApplicationIcon(app.packageName.name)
+                    .toBitmap(width = LauncherIconPx, height = LauncherIconPx)
+                    .asImageBitmap()
+            }.getOrNull()
         } else {
             null
         }
     }
+    var repoIcon by remember(app.appId) { mutableStateOf(app.icon?.path) }
+    var repoFailed by remember(app.appId) { mutableStateOf(false) }
     val shape = MaterialTheme.shapes.large
     // On TV every icon sits on the same rounded card: a full-bleed icon covers it, while a padded or
     // round icon sits centred on it instead of floating at an odd size — so the whole grid reads as
@@ -89,8 +79,6 @@ fun AppMinimalIcon(app: AppMinimal, isInstalled: Boolean, modifier: Modifier = M
         val imageModifier = Modifier
             .fillMaxSize()
             .then(if (isTelevision) Modifier else Modifier.clip(shape))
-        // Local copy so the null-check smart-casts (launcherIcon is a produceState delegate).
-        val launcher = launcherIcon
         when {
             repoIcon != null && !repoFailed -> AsyncImage(
                 model = repoIcon,
@@ -106,8 +94,8 @@ fun AppMinimalIcon(app: AppMinimal, isInstalled: Boolean, modifier: Modifier = M
                 modifier = imageModifier,
             )
 
-            launcher != null -> Image(
-                bitmap = launcher,
+            launcherIcon != null -> Image(
+                bitmap = launcherIcon,
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
                 modifier = imageModifier,
