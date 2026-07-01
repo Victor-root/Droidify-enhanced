@@ -37,11 +37,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.looker.droidify.BuildConfig
 import com.looker.droidify.R
 import com.looker.droidify.compose.components.BackButton
 import com.looker.droidify.compose.components.tvDpadDownTo
@@ -626,6 +628,8 @@ fun SettingsScreen(
                     onClick = { context.openLink(DROID_IFY_URL) },
                 )
             }
+
+            item { VersionFooter() }
         }
     }
 
@@ -646,6 +650,22 @@ fun SettingsScreen(
             onDismiss = { showColorPicker = false },
         )
     }
+}
+
+/** The app version at the very bottom of the settings, with the build type (debug/release/alpha) so
+ *  it's clear which build is installed. Centred and muted, like a page footer. */
+@Composable
+private fun VersionFooter() {
+    Text(
+        text = "${stringResource(R.string.version_FORMAT, BuildConfig.VERSION_NAME)} · " +
+            BuildConfig.BUILD_TYPE,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 24.dp),
+    )
 }
 
 /** A credits/author row with a leading icon, a title and an optional subtitle (e.g. the maintainer's
