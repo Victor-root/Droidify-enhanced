@@ -341,12 +341,13 @@ internal fun RepoIcon(
     fallbackRes: Int? = null,
 ) {
     val shape = MaterialTheme.shapes.large
-    // Prefer the synced icon (freshest); for the many default repos that ship disabled and were never
-    // synced, fall back to the hardcoded logo. Only the letter monogram remains if neither is available
-    // or the chosen image fails to load. Logos are always shown in full colour (no greyscale/dim): the
-    // toggle already signals the on/off state, and most default repos are disabled, so dimming them all
-    // made the whole list look faded.
-    val url = iconUrl?.takeIf { it.isNotBlank() } ?: fallbackUrl
+    // Prefer our curated logo when we have one: those default repos were hand-picked precisely because
+    // their own declared icon is unusable (the generic F-Droid placeholder or a QR code), so a synced
+    // icon must not override it once the repo is enabled and synced. Repos with no curated logo just use
+    // their synced icon. Only the letter monogram remains if neither is available or the image fails to
+    // load. Logos are always shown in full colour (no greyscale/dim): the toggle already signals the
+    // on/off state, and most default repos are disabled, so dimming them all made the list look faded.
+    val url = fallbackUrl?.takeIf { it.isNotBlank() } ?: iconUrl
     var failed by remember(url) { mutableStateOf(false) }
     Box(
         modifier = modifier.clip(shape),
