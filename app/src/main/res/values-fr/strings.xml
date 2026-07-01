@@ -238,6 +238,9 @@
     <string name="connection_error_DESC">Impossible de se connecter au serveur</string>
     <string name="shizuku_not_alive">Shizuku/Sui n\'est pas en fonction</string>
     <string name="shizuku_not_installed">Shizuku/Sui n\'est pas installé</string>
+    <string name="shizuku_not_running">Installation impossible : Shizuku n\'est pas lancé. Démarre Shizuku puis réessaie — ou change de mode d\'installation dans les Paramètres.</string>
+    <string name="shizuku_not_installed_hint">Installation impossible : le mode d\'installation est réglé sur Shizuku, mais Shizuku n\'est pas installé. Installe Shizuku, ou change de mode dans les Paramètres.</string>
+    <string name="shizuku_permission_needed">Installation impossible : Omnify a besoin de l\'autorisation Shizuku. Accorde-la dans la fenêtre Shizuku, puis réessaie.</string>
     <string name="contains_nsfw">Contient des contenus non adaptés pour le travail</string>
     <string name="special_credits">Crédits spéciaux</string>
     <string name="author">Auteur</string>

@@ -1,6 +1,12 @@
 package com.looker.droidify.installer.installers.shizuku
 
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
+import android.widget.Toast
+import com.looker.droidify.R
 import com.looker.droidify.data.model.PackageName
 import com.looker.droidify.installer.installers.Installer
 import com.looker.droidify.installer.installers.uninstallPackage
@@ -9,7 +15,9 @@ import com.looker.droidify.installer.model.InstallState
 import com.looker.droidify.utility.common.SdkCheck
 import com.looker.droidify.utility.common.cache.Cache
 import com.looker.droidify.utility.common.extension.size
+import com.looker.droidify.utility.common.log
 import kotlinx.coroutines.suspendCancellableCoroutine
+import rikka.shizuku.Shizuku
 import java.io.BufferedReader
 import java.io.InputStream
 import kotlin.coroutines.resume
@@ -18,6 +26,50 @@ class ShizukuInstaller(private val context: Context) : Installer {
 
     companion object {
         private val SESSION_ID_REGEX = Regex("(?<=\\[).+?(?=])")
+        private const val PERMISSION_REQUEST_CODE = 87263
+        private const val TAG = "ShizukuInstaller"
+        private const val SHIZUKU_PACKAGE = "moe.shizuku.privileged.api"
+    }
+
+    private fun toast(resId: Int) {
+        Handler(Looper.getMainLooper()).post {
+            Toast.makeText(context, context.getString(resId), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun isShizukuAppInstalled(): Boolean = runCatching {
+        context.packageManager.getPackageInfo(SHIZUKU_PACKAGE, 0)
+    }.isSuccess
+
+    /**
+     * Shizuku must be running and have granted Omnify permission, otherwise [Shizuku.newProcess] throws
+     * immediately and the install would just fail with no explanation (the button flips back to
+     * "Install"). Returns false after telling the user exactly what's wrong and, when possible, opening
+     * Shizuku's permission prompt so a retry works.
+     */
+    private fun shizukuReady(): Boolean {
+        // Not running: either the Shizuku app isn't installed at all, or it's installed but not started.
+        if (!runCatching { Shizuku.pingBinder() }.getOrDefault(false)) {
+            if (isShizukuAppInstalled()) {
+                log("Shizuku is installed but not running", TAG, Log.WARN)
+                toast(R.string.shizuku_not_running)
+            } else {
+                log("Shizuku is not installed", TAG, Log.WARN)
+                toast(R.string.shizuku_not_installed_hint)
+            }
+            return false
+        }
+        val granted = runCatching {
+            !Shizuku.isPreV11() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        }.getOrDefault(false)
+        if (!granted) {
+            log("Shizuku permission not granted", TAG, Log.WARN)
+            // Ask Shizuku to show its permission dialog; the user grants it, then retries the install.
+            runCatching { Shizuku.requestPermission(PERMISSION_REQUEST_CODE) }
+            toast(R.string.shizuku_permission_needed)
+            return false
+        }
+        return true
     }
 
     /**
@@ -32,6 +84,10 @@ class ShizukuInstaller(private val context: Context) : Installer {
         installItem: InstallItem,
     ): InstallState = suspendCancellableCoroutine { cont ->
         cont.invokeOnCancellation { runCatching { runningProcess?.destroy() } }
+        if (!shizukuReady()) {
+            cont.resume(InstallState.Failed)
+            return@suspendCancellableCoroutine
+        }
         var sessionId: String? = null
         val file = Cache.getReleaseFile(context, installItem.installFileName)
         try {
@@ -77,9 +133,10 @@ class ShizukuInstaller(private val context: Context) : Installer {
                 if (cont.isCompleted) return@suspendCancellableCoroutine
                 cont.resume(InstallState.Installed)
             }
-        } catch (_: Exception) {
-            if (sessionId != null) exec("pm install-abandon $sessionId")
-            cont.resume(InstallState.Failed)
+        } catch (e: Exception) {
+            log("Install failed for ${installItem.packageName.name}: $e", TAG, Log.ERROR)
+            if (sessionId != null) runCatching { exec("pm install-abandon $sessionId") }
+            if (cont.isActive) cont.resume(InstallState.Failed)
         }
     }
 

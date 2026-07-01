@@ -154,6 +154,9 @@
     <string name="shizuku_legacy_installer">Shizuku/Sui legacy installer</string>
     <string name="shizuku_not_alive">Shizuku/Sui isn\'t running</string>
     <string name="shizuku_not_installed">Shizuku/Sui isn\'t installed</string>
+    <string name="shizuku_not_running">Can\'t install: Shizuku isn\'t running. Start Shizuku, then try again — or change the installer in Settings.</string>
+    <string name="shizuku_not_installed_hint">Can\'t install: the installer is set to Shizuku, but Shizuku isn\'t installed. Install Shizuku, or change the installer in Settings.</string>
+    <string name="shizuku_permission_needed">Can\'t install: Omnify needs Shizuku permission. Grant it in the Shizuku prompt, then try again.</string>
     <string name="installed">Installed</string>
     <string name="installing">Installing</string>
     <string name="installation_failed">Installation failed</string>
