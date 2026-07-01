@@ -37,7 +37,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
@@ -652,20 +651,37 @@ fun SettingsScreen(
     }
 }
 
-/** The app version at the very bottom of the settings, with the build type (debug/release/alpha) so
- *  it's clear which build is installed. Centred and muted, like a page footer. */
+/** The app version at the very bottom of the settings, as a normal settings row (icon + title +
+ *  subtitle) so it matches the rest. The subtitle carries the version and the build type
+ *  (debug/release/alpha) so it's clear which build is installed. */
 @Composable
 private fun VersionFooter() {
-    Text(
-        text = "${stringResource(R.string.version_FORMAT, BuildConfig.VERSION_NAME)} · " +
-            BuildConfig.BUILD_TYPE,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center,
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 24.dp),
-    )
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_perm_device_information),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(28.dp),
+        )
+        Spacer(Modifier.width(20.dp))
+        Column {
+            Text(
+                text = stringResource(R.string.application_name),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                text = "${stringResource(R.string.version_FORMAT, BuildConfig.VERSION_NAME)} · " +
+                    BuildConfig.BUILD_TYPE,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 /** A credits/author row with a leading icon, a title and an optional subtitle (e.g. the maintainer's
