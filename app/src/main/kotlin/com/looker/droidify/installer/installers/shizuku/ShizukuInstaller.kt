@@ -1,7 +1,6 @@
 package com.looker.droidify.installer.installers.shizuku
 
 import android.content.Context
-import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -17,7 +16,6 @@ import com.looker.droidify.utility.common.cache.Cache
 import com.looker.droidify.utility.common.extension.size
 import com.looker.droidify.utility.common.log
 import kotlinx.coroutines.suspendCancellableCoroutine
-import rikka.shizuku.Shizuku
 import java.io.BufferedReader
 import java.io.InputStream
 import kotlin.coroutines.resume
@@ -26,9 +24,7 @@ class ShizukuInstaller(private val context: Context) : Installer {
 
     companion object {
         private val SESSION_ID_REGEX = Regex("(?<=\\[).+?(?=])")
-        private const val PERMISSION_REQUEST_CODE = 87263
         private const val TAG = "ShizukuInstaller"
-        private const val SHIZUKU_PACKAGE = "moe.shizuku.privileged.api"
     }
 
     private fun toast(resId: Int) {
@@ -37,39 +33,26 @@ class ShizukuInstaller(private val context: Context) : Installer {
         }
     }
 
-    private fun isShizukuAppInstalled(): Boolean = runCatching {
-        context.packageManager.getPackageInfo(SHIZUKU_PACKAGE, 0)
-    }.isSuccess
-
     /**
-     * Shizuku must be running and have granted Omnify permission, otherwise [Shizuku.newProcess] throws
-     * immediately and the install would just fail with no explanation (the button flips back to
-     * "Install"). Returns false after telling the user exactly what's wrong and, when possible, opening
-     * Shizuku's permission prompt so a retry works.
+     * Safety net: Shizuku must be running and have granted Omnify permission, otherwise
+     * Shizuku.newProcess() throws immediately. The install flows already check this before downloading
+     * (see [ShizukuState.installBlockReason]); this re-check covers Shizuku dying between that check and
+     * the actual install, and shows the same short message. Returns false when it isn't usable.
      */
     private fun shizukuReady(): Boolean {
-        // Not running: either the Shizuku app isn't installed at all, or it's installed but not started.
-        if (!runCatching { Shizuku.pingBinder() }.getOrDefault(false)) {
-            if (isShizukuAppInstalled()) {
-                log("Shizuku is installed but not running", TAG, Log.WARN)
-                toast(R.string.shizuku_not_running)
-            } else {
-                log("Shizuku is not installed", TAG, Log.WARN)
-                toast(R.string.shizuku_not_installed_hint)
+        val readiness = ShizukuState.readiness(context)
+        if (readiness == ShizukuState.Readiness.READY) return true
+        log("Shizuku not ready: $readiness", TAG, Log.WARN)
+        when (readiness) {
+            ShizukuState.Readiness.NOT_INSTALLED -> toast(R.string.shizuku_not_installed)
+            ShizukuState.Readiness.NOT_RUNNING -> toast(R.string.shizuku_not_running)
+            ShizukuState.Readiness.NO_PERMISSION -> {
+                ShizukuState.requestPermission()
+                toast(R.string.shizuku_permission_needed)
             }
-            return false
+            ShizukuState.Readiness.READY -> Unit
         }
-        val granted = runCatching {
-            !Shizuku.isPreV11() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
-        }.getOrDefault(false)
-        if (!granted) {
-            log("Shizuku permission not granted", TAG, Log.WARN)
-            // Ask Shizuku to show its permission dialog; the user grants it, then retries the install.
-            runCatching { Shizuku.requestPermission(PERMISSION_REQUEST_CODE) }
-            toast(R.string.shizuku_permission_needed)
-            return false
-        }
-        return true
+        return false
     }
 
     /**
