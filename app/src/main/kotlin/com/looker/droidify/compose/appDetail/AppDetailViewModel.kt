@@ -285,6 +285,13 @@ class AppDetailViewModel @Inject constructor(
         downloadJob = viewModelScope.launch { downloadAndInstall(target.first, target.second) }
     }
 
+    /** Downloads and installs a specific release the user picked from the versions list (verifying its
+     *  hash), instead of the auto-selected best one. */
+    fun installVersion(pkg: Package, repo: Repo) {
+        if (_downloadStatus.value != null) return
+        downloadJob = viewModelScope.launch { downloadAndInstall(pkg, repo) }
+    }
+
     private suspend fun downloadAndInstall(pkg: Package, repo: Repo) {
         // Non-null status = a download is in progress; start at 0 so the bar shows immediately.
         _downloadStatus.value = DownloadStatus(read = 0, total = -1, bytesPerSecond = 0)
