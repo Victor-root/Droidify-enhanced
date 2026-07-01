@@ -32,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -869,7 +870,7 @@ private fun LinksSection(app: App) {
     val author = app.author
     val donateUrl = app.donation?.regularUrl?.firstOrNull()
     Column(modifier = Modifier.fillMaxWidth()) {
-        SectionTitle(stringResource(R.string.links), R.drawable.ic_public)
+        SectionTitle(stringResource(R.string.links), R.drawable.ic_tabler_link)
         links?.webSite?.nonBlank()?.let { url ->
             LinkRow(R.drawable.ic_public, stringResource(R.string.website), url) { open(url) }
         }
@@ -1132,7 +1133,9 @@ private fun SupportedLanguagesSection(localeCodes: List<String>) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                painter = painterResource(R.drawable.ic_language),
+                // The same translate glyph as the top bar's Translate button, so the languages section
+                // reads as "translations" at a glance.
+                imageVector = Icons.Filled.Translate,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp),
