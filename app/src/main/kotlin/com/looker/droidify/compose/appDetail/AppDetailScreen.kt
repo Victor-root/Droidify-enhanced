@@ -446,6 +446,17 @@ private fun AppDetail(
     val installedPackage = app.packages?.firstOrNull { it.installed }
     // A version the user tapped in the list, awaiting confirmation to install (null = no dialog).
     var versionToInstall by remember { mutableStateOf<Pair<Package, Repo>?>(null) }
+    // A downgrade the user confirmed: kept while the current app uninstalls, then installed automatically
+    // once it's gone — so they don't have to tap the version again after the uninstall.
+    var pendingDowngradeInstall by remember { mutableStateOf<Pair<Package, Repo>?>(null) }
+    LaunchedEffect(installedInfo, pendingDowngradeInstall) {
+        val pending = pendingDowngradeInstall ?: return@LaunchedEffect
+        // installedInfo is re-read on every install/uninstall; null means the app is now gone.
+        if (installedInfo == null) {
+            onInstallVersion(pending.first, pending.second)
+            pendingDowngradeInstall = null
+        }
+    }
     versionToInstall?.let { (pkg, repo) ->
         InstallVersionDialog(
             versionName = pkg.manifest.versionName,
@@ -458,6 +469,9 @@ private fun AppDetail(
                 versionToInstall = null
             },
             onUninstall = {
+                // Remember what to install, uninstall the current version, and the effect above installs
+                // it once the app is gone.
+                pendingDowngradeInstall = pkg to repo
                 onUninstall()
                 versionToInstall = null
             },
